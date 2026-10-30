@@ -1,5 +1,6 @@
 import { load, type Store } from "@tauri-apps/plugin-store";
 import { useEffect, useState } from "react";
+import type { Rotation } from "../packs/types";
 
 export type ProviderKind = "claude" | "codex" | "gemini" | "api";
 
@@ -24,6 +25,9 @@ export interface Settings {
   systemPrompt: string;
   theme: string;
   packId: string;
+  /** Packs the companion rotates through (see `packRotation`). */
+  packPool: string[];
+  packRotation: Rotation;
   characterScale: number;
   jumping: boolean;
   jumpInterval: number;
@@ -38,6 +42,8 @@ export const DEFAULTS: Settings = {
   systemPrompt: DEFAULT_PROMPT,
   theme: "neon",
   packId: "builtin.spirit",
+  packPool: ["builtin.spirit"],
+  packRotation: "never",
   characterScale: 1,
   jumping: true,
   jumpInterval: 9,
@@ -62,6 +68,13 @@ export async function readSettings(): Promise<Settings> {
 
 export async function setSetting<K extends keyof Settings>(key: K, value: Settings[K]) {
   await (await store()).set(key, value);
+}
+
+/** Update a setting from its latest stored value (safe against quick successive edits). */
+export async function updateSetting<K extends keyof Settings>(key: K, fn: (value: Settings[K]) => Settings[K]) {
+  const s = await store();
+  const current = ((await s.get(key)) ?? DEFAULTS[key]) as Settings[K];
+  await s.set(key, fn(current));
 }
 
 /** Live settings, updated when any window changes them. */

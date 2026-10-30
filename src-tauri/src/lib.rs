@@ -1,3 +1,4 @@
+mod packs;
 mod providers;
 mod secrets;
 mod shellenv;
@@ -10,6 +11,7 @@ use tauri_plugin_store::StoreExt;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         // A second launch (e.g. `familiar --toggle` bound to a system shortcut on Wayland) talks to this one.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if args.iter().any(|a| a == "--toggle") {
@@ -65,6 +67,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            packs::list_packs,
+            packs::import_gifs,
+            packs::import_pack,
+            packs::delete_pack,
             providers::ask,
             providers::cancel,
             providers::reset,

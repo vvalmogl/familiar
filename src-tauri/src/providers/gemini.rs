@@ -19,7 +19,13 @@ impl CliProvider for Gemini {
             Some(_) => req.prompt.clone(),
             None => format!("{}\n\n{}", req.system_prompt, req.prompt),
         };
-        let mut args = vec!["-p".to_string(), prompt, "--output-format".into(), "stream-json".into()];
+        // Read-only "plan" mode (no shell or file writes), no extensions, no MCP servers.
+        let mut args: Vec<String> = [
+            "-p", &prompt, "--output-format", "stream-json", "--approval-mode", "plan",
+            "--extensions", "none", "--allowed-mcp-server-names", "none",
+        ]
+        .map(String::from)
+        .to_vec();
         if let Some(model) = req.model.as_deref().filter(|m| !m.is_empty()) {
             args.extend(["-m".into(), model.into()]);
         }
@@ -77,6 +83,24 @@ mod tests {
         let out: Vec<_> = lines.iter().flat_map(|l| Gemini.parse(l, &mut st)).collect();
         assert_eq!(out, vec![Event::Text { text: "Мяу! ".into() }]);
         assert_eq!(st.session_id.as_deref(), Some("g1"));
+    }
+
+    #[test]
+    fn runs_read_only_without_extensions_or_mcp() {
+        let req = AskRequest {
+            provider: super::super::ProviderKind::Gemini,
+            prompt: "hi".into(),
+            conversation: "c".into(),
+            model: None,
+            system_prompt: "sp".into(),
+            api_base_url: None,
+        };
+        let args = Gemini.arguments(&req, Some("g1"));
+        for pair in [["--approval-mode", "plan"], ["--extensions", "none"], ["--allowed-mcp-server-names", "none"]] {
+            assert!(args.windows(2).any(|w| w == pair), "missing {pair:?}");
+        }
+        assert!(!args.iter().any(|a| a == "--yolo" || a == "-y"));
+        assert_eq!(&args[args.len() - 2..], ["--resume", "g1"]);
     }
 
     #[test]

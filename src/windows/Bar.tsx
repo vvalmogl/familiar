@@ -216,9 +216,13 @@ export default function Bar() {
             <div className="turn" key={i}>
               <div className="q">› {t.q}</div>
               <Markdown
+                // Model output is untrusted: no remote images (they could leak data via the URL),
+                // and links open in the browser only for http(s).
+                disallowedElements={["img"]}
+                unwrapDisallowed
                 components={{
                   a: ({ href, children }) => (
-                    <a href={href} onClick={(e) => (e.preventDefault(), href && openUrl(href))}>
+                    <a href={href} onClick={(e) => (e.preventDefault(), href && /^https?:\/\//i.test(href) && openUrl(href))}>
                       {children}
                     </a>
                   ),

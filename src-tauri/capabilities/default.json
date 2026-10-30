@@ -24,6 +24,9 @@
     "core:window:allow-set-ignore-cursor-events",
     "core:event:allow-emit",
     "core:event:allow-emit-to",
-    "core:event:allow-listen"
+    "core:event:allow-listen",
+    "dialog:default",
+    "core:path:default",
+    "core:webview:default"
   ]
 }

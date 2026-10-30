@@ -3,10 +3,13 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 import { prettyHotkey, toAccelerator } from "../lib/hotkey";
-import { DEFAULT_PROMPT, PROVIDERS, setSetting, useSettings, type ProviderKind, type Settings } from "../lib/settings";
+import { DEFAULT_PROMPT, PROVIDERS, setSetting, updateSetting, useSettings, type ProviderKind, type Settings } from "../lib/settings";
 import { applyTheme, THEMES, themeById } from "../lib/themes";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import Spirit from "../packs/Spirit";
-import { BUILTIN_PACKS } from "../packs/registry";
+import { guessMood } from "../packs/moods";
+import { notifyPacksChanged, usePacks } from "../packs/registry";
+import { MOODS, type Mood, type Pack, type Rotation } from "../packs/types";
 
 type View = "onboarding" | "settings";
 
@@ -155,18 +158,108 @@ function ThemePicker({ value }: { value: string }) {
   );
 }
 
+const ROTATIONS: { id: Rotation; title: string }[] = [
+  { id: "never", title: "Не менять" },
+  { id: "show", title: "При каждом открытии" },
+  { id: "jump", title: "При каждом прыжке" },
+];
+
+function PackPreview({ pack }: { pack: Pack }) {
+  if (pack.kind === "svg") return <Spirit mood="idle" />;
+  return pack.preview ? <img src={pack.preview} alt="" draggable={false} /> : null;
+}
+
 function CharacterSettings({ settings }: { settings: Settings }) {
+  const packs = usePacks();
+  const [importing, setImporting] = useState<string[] | null>(null);
+  const [error, setError] = useState("");
+  const pool = new Set([settings.packId, ...settings.packPool]);
+
+  const choose = async (id: string) => {
+    await setSetting("packId", id);
+    await updateSetting("packPool", (p) => (p.includes(id) ? p : [...p, id]));
+  };
+  const togglePool = (id: string) =>
+    updateSetting("packPool", (p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  const pickGifs = async () => {
+    const files = await openDialog({
+      multiple: true,
+      filters: [{ name: "Картинки и гифки", extensions: ["gif", "png", "webp", "jpg", "jpeg", "apng"] }],
+    });
+    if (files && files.length) setImporting(files);
+  };
+  const importPack = async (directory: boolean) => {
+    const path = await openDialog(
+      directory ? { directory: true } : { filters: [{ name: "Пак Familiar", extensions: ["fampack", "zip"] }] },
+    );
+    if (!path) return;
+    try {
+      const id = await invoke<string>("import_pack", { path });
+      await notifyPacksChanged();
+      choose(id);
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+  const remove = async (p: Pack) => {
+    if (!confirm(`Удалить пак «${p.name}»?`)) return;
+    await invoke("delete_pack", { id: p.id });
+    if (settings.packId === p.id) await setSetting("packId", "builtin.spirit");
+    await updateSetting("packPool", (pool) => pool.filter((x) => x !== p.id));
+    await notifyPacksChanged();
+  };
+
+  if (importing) {
+    return (
+      <ImportWizard
+        files={importing}
+        onCancel={() => setImporting(null)}
+        onDone={(id) => {
+          setImporting(null);
+          choose(id);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <div className="packs">
-        {BUILTIN_PACKS.map((p) => (
-          <button key={p.id} className={`pack ${p.id === settings.packId ? "on" : ""}`} onClick={() => setSetting("packId", p.id)}>
-            <div className="pack-preview">{p.kind === "svg" && <Spirit mood="idle" />}</div>
-            {p.name}
-          </button>
+        {packs.map((p) => (
+          <div key={p.id} className={`pack ${p.id === settings.packId ? "on" : ""}`}>
+            <button className="pack-preview" onClick={() => choose(p.id)} title="Сделать основным">
+              <PackPreview pack={p} />
+            </button>
+            <div className="pack-meta">
+              <b>{p.name}</b>
+              {p.license && <span className="muted">{p.license}</span>}
+            </div>
+            <div className="pack-actions">
+              <label className="check" title="Участвует в смене персонажей">
+                <input type="checkbox" checked={pool.has(p.id)} disabled={p.id === settings.packId} onChange={() => togglePool(p.id)} />
+                в наборе
+              </label>
+              {!p.builtin && p.kind === "images" && (
+                <button className="icon" onClick={() => remove(p)} title="Удалить пак">🗑</button>
+              )}
+            </div>
+          </div>
         ))}
       </div>
-      <p className="muted">Импорт своих гифок и паков — в следующем обновлении.</p>
+      <div className="presets">
+        <button className="primary" onClick={pickGifs}>Импортировать гифки…</button>
+        <button onClick={() => importPack(false)}>Пак из файла .fampack…</button>
+        <button onClick={() => importPack(true)}>Пак из папки…</button>
+      </div>
+      {error && <p className="status bad">{error}</p>}
+      <label className="field">
+        Менять персонажа
+        <select value={settings.packRotation} onChange={(e) => setSetting("packRotation", e.target.value as Rotation)}>
+          {ROTATIONS.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
+        </select>
+      </label>
       <label className="field">
         Размер: {Math.round(settings.characterScale * 100)}%
         <input type="range" min={0.5} max={1.6} step={0.05} value={settings.characterScale}
@@ -184,6 +277,53 @@ function CharacterSettings({ settings }: { settings: Settings }) {
         </label>
       )}
     </>
+  );
+}
+
+/** Turn loose GIFs into a pack: name it and say which mood each image is for. */
+function ImportWizard({ files, onCancel, onDone }: { files: string[]; onCancel: () => void; onDone: (id: string) => void }) {
+  const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p;
+  const [name, setName] = useState("Мой персонаж");
+  const [moods, setMoods] = useState<Mood[]>(() => files.map((f) => guessMood(fileName(f))));
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const id = await invoke<string>("import_gifs", {
+        name,
+        files: files.map((path, i) => ({ path, mood: moods[i] })),
+      });
+      await notifyPacksChanged();
+      onDone(id);
+    } catch (e) {
+      setError(String(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="wizard">
+      <label className="field">
+        Название пака
+        <input value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <p className="muted">Для каждой картинки выбери, когда её показывать. Без «Обычного» первая картинка станет обычной.</p>
+      <div className="wizard-files">
+        {files.map((f, i) => (
+          <div key={f} className="row">
+            <span className="file">{fileName(f)}</span>
+            <select value={moods[i]} onChange={(e) => setMoods(moods.map((m, j) => (j === i ? (e.target.value as Mood) : m)))}>
+              {MOODS.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+      {error && <p className="status bad">{error}</p>}
+      <div className="presets">
+        <button onClick={onCancel}>Отмена</button>
+        <button className="primary" disabled={busy || !name.trim()} onClick={save}>Создать пак</button>
+      </div>
+    </div>
   );
 }
 

@@ -22,18 +22,20 @@ impl CliProvider for Codex {
             Some(m) => vec!["-m".into(), m.into()],
             None => vec![],
         };
+        // Always read-only: `exec` takes `-s`, `exec resume` only accepts it as a config override.
+        // `--` keeps a prompt that starts with "-" from being parsed as a flag.
         let mut args: Vec<String> = vec!["exec".into()];
         match session_id {
             Some(id) => {
-                args.extend(["resume", "--json", "--skip-git-repo-check"].map(String::from));
+                args.extend(["resume", "-c", "sandbox_mode=\"read-only\"", "--json", "--skip-git-repo-check"].map(String::from));
                 args.extend(model);
-                args.extend([id.to_string(), req.prompt.clone()]);
+                args.extend(["--".to_string(), id.to_string(), req.prompt.clone()]);
             }
             None => {
                 args.extend(["--json", "--skip-git-repo-check", "-s", "read-only"].map(String::from));
                 args.extend(model);
                 // Codex has no system-prompt flag; the instructions ride along with the first turn.
-                args.push(format!("{}\n\n{}", req.system_prompt, req.prompt));
+                args.extend(["--".to_string(), format!("{}\n\n{}", req.system_prompt, req.prompt)]);
             }
         }
         args
@@ -111,6 +113,27 @@ mod tests {
         let out: Vec<_> = [a, b, c].iter().flat_map(|l| Codex.parse(l, &mut st)).collect();
         assert_eq!(out, vec![Event::Text { text: "17 × 23".into() }, Event::Text { text: " = 391".into() }]);
         assert_eq!(st.session_id.as_deref(), Some("t1"));
+    }
+
+    fn req(prompt: &str) -> AskRequest {
+        AskRequest {
+            provider: super::super::ProviderKind::Codex,
+            prompt: prompt.into(),
+            conversation: "c".into(),
+            model: None,
+            system_prompt: "sp".into(),
+            api_base_url: None,
+        }
+    }
+
+    #[test]
+    fn every_turn_is_read_only_and_prompt_is_positional() {
+        let first = Codex.arguments(&req("-rf"), None);
+        assert!(first.windows(2).any(|w| w == ["-s", "read-only"]));
+        assert_eq!(first[first.len() - 2], "--");
+        let resumed = Codex.arguments(&req("-rf"), Some("t1"));
+        assert!(resumed.windows(2).any(|w| w == ["-c", "sandbox_mode=\"read-only\""]));
+        assert_eq!(&resumed[resumed.len() - 3..], ["--", "t1", "-rf"]);
     }
 
     #[test]
