@@ -107,6 +107,14 @@ pub fn open_main(app: AppHandle, section: Option<String>) {
     }
 }
 
+/// Route `familiar://…` links: sign-in callbacks go to the main window.
+pub fn handle_deep_link(app: &AppHandle, url: &str) {
+    if url.starts_with("familiar://auth-callback") {
+        open_main(app.clone(), Some("account".into()));
+        let _ = app.emit_to("main", "auth:callback", url.to_string());
+    }
+}
+
 /// Replace the global hotkey. Fails (and keeps the old one) if the combo is invalid or taken.
 #[tauri::command]
 pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {

@@ -388,6 +388,45 @@ fn stamp() -> u128 {
         .unwrap_or_default()
 }
 
+/// Largest pack the gallery may download.
+const MAX_DOWNLOAD_BYTES: u64 = 50 * 1024 * 1024;
+
+/// Download a `.fampack` from the gallery (HTTPS only, size-capped) and install it.
+#[tauri::command]
+pub async fn install_pack_from_url(app: AppHandle, url: String) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use std::io::Write;
+    if !url.starts_with("https://") {
+        return Err("пак можно скачать только по https".into());
+    }
+    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("сервер ответил {}", resp.status()));
+    }
+    if resp.content_length().is_some_and(|n| n > MAX_DOWNLOAD_BYTES) {
+        return Err("пак слишком большой".into());
+    }
+    let tmp = std::env::temp_dir().join(format!("familiar-download-{}.fampack", stamp()));
+    let result = async {
+        let mut file = fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        let mut total: u64 = 0;
+        let mut stream = resp.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| e.to_string())?;
+            total += chunk.len() as u64;
+            if total > MAX_DOWNLOAD_BYTES {
+                return Err("пак слишком большой".to_string());
+            }
+            file.write_all(&chunk).map_err(|e| e.to_string())?;
+        }
+        drop(file);
+        Ok(install(&user_dir(&app)?, &tmp, stamp())?.id)
+    }
+    .await;
+    let _ = fs::remove_file(&tmp);
+    result
+}
+
 /// Let the import wizard preview images the user just picked (they live outside the pack folders).
 #[tauri::command]
 pub fn allow_previews(app: AppHandle, paths: Vec<String>) -> Result<(), String> {

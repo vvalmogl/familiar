@@ -11,6 +11,7 @@ import { guessMood } from "../packs/moods";
 import { notifyPacksChanged, usePacks } from "../packs/registry";
 import { MOODS, type Mood, type Pack, type Rotation } from "../packs/types";
 import ProviderSetup from "./ProviderSetup";
+import { AccountSection, GallerySection, useAccount } from "./Account";
 
 type View = "onboarding" | "settings";
 
@@ -18,13 +19,15 @@ export default function Main() {
   const settings = useSettings();
   const [view, setView] = useState<View>("settings");
   const [section, setSection] = useState<Section>("Нейросеть");
+  // Sign-in callbacks and settings sync run whatever the window shows.
+  const account = useAccount();
 
   useEffect(() => {
     const un = listen<string>("main:navigate", ({ payload }) => {
       if (payload === "onboarding" || payload === "settings") setView(payload);
-      if (payload === "hotkey") {
+      if (payload === "hotkey" || payload === "account") {
         setView("settings");
-        setSection("Клавиши");
+        setSection(payload === "hotkey" ? "Клавиши" : "Аккаунт");
       }
     });
     return () => void un.then((f) => f());
@@ -40,7 +43,7 @@ export default function Main() {
   return view === "onboarding" ? (
     <Onboarding settings={settings} onDone={() => setView("settings")} />
   ) : (
-    <SettingsView settings={settings} section={section} setSection={setSection} />
+    <SettingsView settings={settings} section={section} setSection={setSection} account={account} />
   );
 }
 
@@ -99,10 +102,15 @@ function Onboarding({ settings, onDone }: { settings: Settings; onDone: () => vo
 
 // ───────────────────────────── settings ─────────────────────────────
 
-const SECTIONS = ["Нейросеть", "Внешний вид", "Персонаж", "Клавиши", "Аккаунт", "О программе"] as const;
+const SECTIONS = ["Нейросеть", "Внешний вид", "Персонаж", "Галерея", "Клавиши", "Аккаунт", "О программе"] as const;
 type Section = (typeof SECTIONS)[number];
 
-function SettingsView({ settings, section, setSection }: { settings: Settings; section: Section; setSection: (s: Section) => void }) {
+function SettingsView({ settings, section, setSection, account }: {
+  settings: Settings;
+  section: Section;
+  setSection: (s: Section) => void;
+  account: ReturnType<typeof useAccount>;
+}) {
   return (
     <div className="settings">
       <nav>
@@ -138,9 +146,8 @@ function SettingsView({ settings, section, setSection }: { settings: Settings; s
             </p>
           </>
         )}
-        {section === "Аккаунт" && (
-          <p className="muted">Вход и синхронизация настроек появятся в следующей версии. Без аккаунта всё работает.</p>
-        )}
+        {section === "Галерея" && <GallerySection />}
+        {section === "Аккаунт" && <AccountSection account={account} />}
         {section === "О программе" && (
           <p className="muted">Familiar 0.1.0 · открытый код, лицензия Apache-2.0.</p>
         )}

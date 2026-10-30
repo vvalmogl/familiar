@@ -12,6 +12,7 @@ use tauri_plugin_store::StoreExt;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         // A second launch (e.g. `familiar --toggle` bound to a system shortcut on Wayland) talks to this one.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -40,6 +41,24 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             windows::setup_tray(app.handle())?;
+
+            // familiar://auth-callback?code=… returns from the browser after signing in.
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                #[cfg(any(windows, target_os = "linux"))]
+                let _ = app.deep_link().register_all();
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        windows::handle_deep_link(&handle, url.as_str());
+                    }
+                });
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls {
+                        windows::handle_deep_link(app.handle(), url.as_str());
+                    }
+                }
+            }
 
             let store = app.store("settings.json")?;
             let hotkey = store
@@ -87,6 +106,7 @@ pub fn run() {
             windows::set_hotkey,
             windows::hotkey_status,
             packs::allow_previews,
+            packs::install_pack_from_url,
             setup::cli_status,
             setup::cli_install,
             setup::cli_login,
