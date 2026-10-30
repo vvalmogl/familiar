@@ -305,10 +305,23 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Limits for unpacking a `.fampack`, so a crafted archive can't fill the disk (zip bomb).
+const MAX_ZIP_ENTRIES: usize = 2000;
+const MAX_ZIP_BYTES: u64 = 200 * 1024 * 1024;
+
 /// Unpack a `.fampack` zip into `dest`, refusing entries that would escape it.
 pub fn extract_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
+    extract_zip_limited(zip_path, dest, MAX_ZIP_ENTRIES, MAX_ZIP_BYTES)
+}
+
+fn extract_zip_limited(zip_path: &Path, dest: &Path, max_entries: usize, max_bytes: u64) -> Result<(), String> {
     let file = fs::File::open(zip_path).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("не zip-архив: {e}"))?;
+    if archive.len() > max_entries {
+        return Err(format!("в архиве слишком много файлов (больше {max_entries})"));
+    }
+    // Count bytes actually written: sizes in zip headers can lie.
+    let mut remaining = max_bytes;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
         let Some(rel) = entry.enclosed_name() else {
@@ -322,7 +335,11 @@ pub fn extract_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
             let mut w = fs::File::create(&out).map_err(|e| e.to_string())?;
-            std::io::copy(&mut entry, &mut w).map_err(|e| e.to_string())?;
+            let written = std::io::copy(&mut std::io::Read::take(&mut entry, remaining + 1), &mut w).map_err(|e| e.to_string())?;
+            if written > remaining {
+                return Err(format!("архив слишком большой после распаковки (больше {} МБ)", max_bytes / 1024 / 1024));
+            }
+            remaining -= written;
         }
     }
     Ok(())
@@ -486,5 +503,29 @@ mod tests {
         }
         assert!(install(root.path(), &evil, 3).unwrap_err().contains("недопустимый"));
         assert!(!root.path().parent().unwrap().join("escape.gif").exists());
+    }
+
+    #[test]
+    fn refuses_zip_bombs() {
+        let dir = tempfile::tempdir().unwrap();
+        let bomb = dir.path().join("bomb.fampack");
+        {
+            // 1 MB of zeros compresses to almost nothing.
+            let mut z = zip::ZipWriter::new(fs::File::create(&bomb).unwrap());
+            let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+            for i in 0..3 {
+                z.start_file(format!("big{i}.gif"), opts).unwrap();
+                z.write_all(&vec![0u8; 1024 * 1024]).unwrap();
+            }
+            z.finish().unwrap();
+        }
+        assert!(fs::metadata(&bomb).unwrap().len() < 100 * 1024);
+
+        let out = dir.path().join("out");
+        let err = extract_zip_limited(&bomb, &out, 100, 2 * 1024 * 1024).unwrap_err();
+        assert!(err.contains("слишком большой"), "{err}");
+        let err = extract_zip_limited(&bomb, &dir.path().join("out2"), 2, u64::MAX / 2).unwrap_err();
+        assert!(err.contains("слишком много"), "{err}");
+        assert!(extract_zip_limited(&bomb, &dir.path().join("out3"), 100, 4 * 1024 * 1024).is_ok());
     }
 }
