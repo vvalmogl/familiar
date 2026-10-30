@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Familiar",
+  "version": "0.1.0",
+  "identifier": "app.familiar.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Familiar",
+        "url": "index.html#main",
+        "width": 880,
+        "height": 640,
+        "minWidth": 720,
+        "minHeight": 520,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "bar",
+        "url": "index.html#bar",
+        "width": 680,
+        "height": 58,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visibleOnAllWorkspaces": true,
+        "visible": false
+      },
+      {
+        "label": "character",
+        "url": "index.html#character",
+        "width": 360,
+        "height": 203,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "visibleOnAllWorkspaces": true,
+        "visible": false,
+        "focusable": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/packs/**",
+          "$RESOURCE/packs/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "AI quick bar with an animated companion",
+    "resources": {
+      "../packs/builtin": "packs"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
