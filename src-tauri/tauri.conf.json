@@ -72,7 +72,8 @@
     "category": "Productivity",
     "shortDescription": "AI quick bar with an animated companion",
     "resources": {
-      "../packs/builtin": "packs"
+      "../packs/builtin": "packs",
+      "resources/install-node-cli.sh": "resources/install-node-cli.sh"
     },
     "icon": [
       "icons/32x32.png",

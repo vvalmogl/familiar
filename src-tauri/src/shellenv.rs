@@ -4,7 +4,7 @@
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
 
-fn home() -> PathBuf {
+pub fn home() -> PathBuf {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from).unwrap_or_default()
 }
 
@@ -27,7 +27,7 @@ static PATH: Lazy<String> = Lazy::new(|| {
             }
         }
         let h = home();
-        for extra in [".local/gemini-node/bin", ".local/bin", ".npm-global/bin"] {
+        for extra in [".local/familiar-node/bin", ".local/gemini-node/bin", ".local/bin", ".npm-global/bin"] {
             parts.push(h.join(extra).to_string_lossy().into());
         }
         parts.extend(["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].map(String::from));

@@ -112,13 +112,38 @@ pub fn open_main(app: AppHandle, section: Option<String>) {
 pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     let new: Shortcut = accelerator.parse().map_err(|e| format!("неверное сочетание: {e}"))?;
     let gs = app.global_shortcut();
+    let state = app.state::<HotkeyState>();
+    let mut state = state.0.lock().unwrap();
     let _ = gs.unregister_all();
-    let result = gs.register(new);
-    if let Err(e) = result {
-        let _ = gs.register(DEFAULT_HOTKEY.parse::<Shortcut>().expect("default hotkey"));
-        return Err(format!("сочетание занято другой программой: {e}"));
+    if gs.register(new).is_err() {
+        // Keep the previous combo working, if there was one.
+        if let Some(prev) = state.current.as_deref().and_then(|p| p.parse::<Shortcut>().ok()) {
+            let _ = gs.register(prev);
+        }
+        let error = format!("{} уже занято другой программой (например, Raycast, Alfred или Spotlight). Выбери другое сочетание.", accelerator);
+        if state.current.is_none() {
+            state.error = Some(error.clone());
+        }
+        return Err(error);
     }
+    state.current = Some(accelerator);
+    state.error = None;
     Ok(())
+}
+
+/// The global hotkey that is actually registered, and why the saved one failed (if it did).
+#[derive(Default)]
+pub struct HotkeyState(std::sync::Mutex<HotkeyInfo>);
+
+#[derive(Default, Clone, serde::Serialize)]
+pub struct HotkeyInfo {
+    current: Option<String>,
+    error: Option<String>,
+}
+
+#[tauri::command]
+pub fn hotkey_status(state: tauri::State<'_, HotkeyState>) -> HotkeyInfo {
+    state.0.lock().unwrap().clone()
 }
 
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {

@@ -30,6 +30,10 @@ Project layout:
 | `src-tauri/src/providers/` | AI providers: CLI streaming (claude, codex, gemini) and OpenAI-compatible HTTP |
 | `src-tauri/src/windows.rs` | Hotkey, tray, showing/hiding windows |
 
+### Hotkey conflicts
+
+If the saved hotkey can't be registered at startup, Familiar opens Settings → Keys with a warning. On Windows and Linux (X11) registration fails when another app owns the combo, so this catches conflicts there (not yet tested on those systems). macOS lets several apps register the same combo silently (all of them react), so there Familiar can't detect it — pick a combo no other launcher uses.
+
 ### Linux / Wayland
 
 GNOME on Wayland doesn't let apps register global hotkeys. Bind a system shortcut to `familiar --toggle` instead.
@@ -37,8 +41,8 @@ GNOME on Wayland doesn't let apps register global hotkeys. Bind a system shortcu
 ## Roadmap
 
 - [x] M0–M1: cross-platform shell, hotkey, streaming answers from 4 provider types, themes, onboarding
-- [ ] M2: character packs (`pack.json`), GIF import, moods
-- [ ] M3: polished onboarding, one-click CLI install/login
+- [x] M2: character packs (`pack.json`), GIF import, moods
+- [x] M3: one-click CLI install & sign-in (Claude, ChatGPT/Codex, Gemini) with live log, hotkey conflict warning, import previews
 - [ ] M4: optional account (Supabase): settings sync, pack gallery
 - [ ] M5: signed releases with auto-update, website
 - [ ] Later: pack store for original artist-made companions

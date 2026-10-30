@@ -1,25 +1,31 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 import { prettyHotkey, toAccelerator } from "../lib/hotkey";
-import { DEFAULT_PROMPT, PROVIDERS, setSetting, updateSetting, useSettings, type ProviderKind, type Settings } from "../lib/settings";
+import { DEFAULT_PROMPT, PROVIDERS, setSetting, updateSetting, useSettings, type Settings } from "../lib/settings";
 import { applyTheme, THEMES, themeById } from "../lib/themes";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import Spirit from "../packs/Spirit";
 import { guessMood } from "../packs/moods";
 import { notifyPacksChanged, usePacks } from "../packs/registry";
 import { MOODS, type Mood, type Pack, type Rotation } from "../packs/types";
+import ProviderSetup from "./ProviderSetup";
 
 type View = "onboarding" | "settings";
 
 export default function Main() {
   const settings = useSettings();
   const [view, setView] = useState<View>("settings");
+  const [section, setSection] = useState<Section>("Нейросеть");
 
   useEffect(() => {
     const un = listen<string>("main:navigate", ({ payload }) => {
       if (payload === "onboarding" || payload === "settings") setView(payload);
+      if (payload === "hotkey") {
+        setView("settings");
+        setSection("Клавиши");
+      }
     });
     return () => void un.then((f) => f());
   }, []);
@@ -34,7 +40,7 @@ export default function Main() {
   return view === "onboarding" ? (
     <Onboarding settings={settings} onDone={() => setView("settings")} />
   ) : (
-    <SettingsView settings={settings} />
+    <SettingsView settings={settings} section={section} setSection={setSection} />
   );
 }
 
@@ -94,9 +100,9 @@ function Onboarding({ settings, onDone }: { settings: Settings; onDone: () => vo
 // ───────────────────────────── settings ─────────────────────────────
 
 const SECTIONS = ["Нейросеть", "Внешний вид", "Персонаж", "Клавиши", "Аккаунт", "О программе"] as const;
+type Section = (typeof SECTIONS)[number];
 
-function SettingsView({ settings }: { settings: Settings }) {
-  const [section, setSection] = useState<(typeof SECTIONS)[number]>("Нейросеть");
+function SettingsView({ settings, section, setSection }: { settings: Settings; section: Section; setSection: (s: Section) => void }) {
   return (
     <div className="settings">
       <nav>
@@ -287,6 +293,10 @@ function ImportWizard({ files, onCancel, onDone }: { files: string[]; onCancel: 
   const [moods, setMoods] = useState<Mood[]>(() => files.map((f) => guessMood(fileName(f))));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [previews, setPreviews] = useState(false);
+  useEffect(() => {
+    invoke("allow_previews", { paths: files }).then(() => setPreviews(true)).catch(() => {});
+  }, [files]);
   const save = async () => {
     setBusy(true);
     try {
@@ -311,6 +321,7 @@ function ImportWizard({ files, onCancel, onDone }: { files: string[]; onCancel: 
       <div className="wizard-files">
         {files.map((f, i) => (
           <div key={f} className="row">
+            {previews && <img className="thumb" src={convertFileSrc(f)} alt="" />}
             <span className="file">{fileName(f)}</span>
             <select value={moods[i]} onChange={(e) => setMoods(moods.map((m, j) => (j === i ? (e.target.value as Mood) : m)))}>
               {MOODS.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
@@ -335,12 +346,6 @@ interface Detected {
   gemini: string | null;
   ollama: boolean;
 }
-
-const HOW_TO: Record<Exclude<ProviderKind, "api">, string> = {
-  claude: "Установи Claude Code (claude.com/claude-code) и один раз запусти `claude` в терминале, чтобы войти.",
-  codex: "Установи Codex и войди аккаунтом ChatGPT: `codex login`.",
-  gemini: "Установи Gemini CLI (`npm i -g @google/gemini-cli`), запусти `gemini` и выбери «Sign in with Google». Бесплатно с дневным лимитом.",
-};
 
 const API_PRESETS = [
   { name: "OpenRouter", url: "https://openrouter.ai/api/v1", model: "qwen/qwen3.8-flash" },
@@ -369,10 +374,7 @@ function ProviderSettings({ settings }: { settings: Settings }) {
       </div>
       {p !== "api" ? (
         <>
-          <p className={detected?.[p] ? "status ok" : "status bad"}>
-            {detected === null ? "Проверяю…" : detected[p] ? `Найден: ${detected[p]}` : "Не установлен"}
-          </p>
-          <p className="muted">{HOW_TO[p]}</p>
+          <ProviderSetup kind={p} />
           <label className="field">
             Модель (пусто — по умолчанию)
             <input value={settings.models[p]} onChange={(e) => setModel(e.target.value)} />
@@ -433,6 +435,9 @@ function ApiSettings({ settings, ollama, setModel }: { settings: Settings; ollam
 function HotkeyRecorder({ value }: { value: string }) {
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => {
+    invoke<{ current: string | null; error: string | null }>("hotkey_status").then((s) => setError(s.error ?? ""));
+  }, []);
   useEffect(() => {
     if (!recording) return;
     const onKey = async (e: KeyboardEvent) => {

@@ -388,6 +388,16 @@ fn stamp() -> u128 {
         .unwrap_or_default()
 }
 
+/// Let the import wizard preview images the user just picked (they live outside the pack folders).
+#[tauri::command]
+pub fn allow_previews(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    let scope = app.asset_protocol_scope();
+    for p in paths.iter().filter(|p| is_image(p)) {
+        scope.allow_file(p).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn import_gifs(app: AppHandle, name: String, files: Vec<ImportFile>) -> Result<String, String> {
     Ok(create_from_images(&user_dir(&app)?, &name, &files, stamp())?.id)

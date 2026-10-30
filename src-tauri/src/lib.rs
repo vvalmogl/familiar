@@ -1,6 +1,7 @@
 mod packs;
 mod providers;
 mod secrets;
+mod setup;
 mod shellenv;
 mod windows;
 
@@ -33,6 +34,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .manage(providers::Providers::default())
+        .manage(windows::HotkeyState::default())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -44,13 +46,14 @@ pub fn run() {
                 .get("hotkey")
                 .and_then(|v| v.as_str().map(String::from))
                 .unwrap_or_else(|| windows::DEFAULT_HOTKEY.into());
-            if windows::set_hotkey(app.handle().clone(), hotkey).is_err() {
-                eprintln!("global hotkey unavailable");
-            }
+            let hotkey_ok = windows::set_hotkey(app.handle().clone(), hotkey).is_ok();
 
             let onboarded = store.get("onboarded").and_then(|v| v.as_bool()).unwrap_or(false);
             if !onboarded {
                 windows::open_main(app.handle().clone(), Some("onboarding".into()));
+            } else if !hotkey_ok {
+                // Without a hotkey the bar is unreachable: say so and let the user pick another combo.
+                windows::open_main(app.handle().clone(), Some("hotkey".into()));
             }
             if std::env::args().any(|a| a == "--toggle") {
                 windows::toggle_bar(app.handle());
@@ -82,6 +85,12 @@ pub fn run() {
             windows::show_character,
             windows::open_main,
             windows::set_hotkey,
+            windows::hotkey_status,
+            packs::allow_previews,
+            setup::cli_status,
+            setup::cli_install,
+            setup::cli_login,
+            setup::open_in_terminal,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

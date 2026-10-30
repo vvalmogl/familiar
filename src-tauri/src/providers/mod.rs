@@ -9,6 +9,17 @@ mod openai;
 
 pub use openai::key_name as api_key_name;
 
+/// Path of the CLI behind a provider, if installed.
+pub fn cli_executable(kind: ProviderKind) -> Option<String> {
+    use cli::CliProvider;
+    match kind {
+        ProviderKind::Claude => claude::Claude.executable(),
+        ProviderKind::Codex => codex::Codex.executable(),
+        ProviderKind::Gemini => gemini::Gemini.executable(),
+        ProviderKind::Api => None,
+    }
+}
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;

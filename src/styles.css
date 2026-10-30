@@ -216,3 +216,18 @@ select { font: inherit; color: inherit; background: rgba(127, 127, 140, 0.08); b
 .wizard-files { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; margin: 10px 0; }
 .wizard-files .row { align-items: center; justify-content: space-between; }
 .wizard-files .file { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ───────── provider setup / import wizard ───────── */
+.setup .status .muted { font-size: 12px; }
+.log {
+  font: 12px/1.45 ui-monospace, monospace;
+  background: rgba(127, 127, 140, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.wizard .thumb { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: rgba(127, 127, 140, 0.12); }
+.hotkey .status.bad { flex-basis: 100%; }
