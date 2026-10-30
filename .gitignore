@@ -27,3 +27,4 @@ dist-ssr
 packs/local/
 .env
 .env.*
+!.env.example
