@@ -1,5 +1,5 @@
 import { decompressFrame, parseGIF, type ParsedFrame } from "gifuct-js";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   src: string;
@@ -8,6 +8,10 @@ interface Props {
   onSize?: (w: number, h: number) => void;
 }
 
+/** GIFs come from third-party packs: refuse ones that would need absurd amounts of memory. */
+const MAX_SIDE = 2048;
+const MAX_FRAMES = 1000;
+
 const isGif = (src: string) => /\.gif$/i.test(decodeURIComponent(new URL(src, location.href).pathname));
 
 /**
@@ -15,7 +19,8 @@ const isGif = (src: string) => /\.gif$/i.test(decodeURIComponent(new URL(src, lo
  * "Auto-play animated images" is off, so GIFs are decoded and played on a canvas here.
  */
 export default function AnimatedImage({ src, className, onSize }: Props) {
-  if (!isGif(src)) {
+  const [plain, setPlain] = useState<string | null>(null);
+  if (!isGif(src) || plain === src) {
     return (
       <img
         className={className}
@@ -26,10 +31,10 @@ export default function AnimatedImage({ src, className, onSize }: Props) {
       />
     );
   }
-  return <GifCanvas key={src} src={src} className={className} onSize={onSize} />;
+  return <GifCanvas key={src} src={src} className={className} onSize={onSize} onReject={() => setPlain(src)} />;
 }
 
-function GifCanvas({ src, className, onSize }: Props) {
+function GifCanvas({ src, className, onSize, onReject }: Props & { onReject: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const sizeCb = useRef(onSize);
   sizeCb.current = onSize;
@@ -42,14 +47,24 @@ function GifCanvas({ src, className, onSize }: Props) {
       const c = canvas.current;
       if (!alive || !c) return;
       const { width, height } = gif.lsd;
+      const frames = gif.frames.filter((f) => "image" in f) as Parameters<typeof decompressFrame>[0][];
+      const fits = (d: { left: number; top: number; width: number; height: number }) =>
+        d.left + d.width <= width && d.top + d.height <= height;
+      if (
+        !(width > 0 && height > 0 && width <= MAX_SIDE && height <= MAX_SIDE) ||
+        frames.length === 0 ||
+        frames.length > MAX_FRAMES ||
+        !frames.every((f) => fits(f.image.descriptor))
+      ) {
+        onReject(); // let WebKit show it the usual way instead
+        return;
+      }
       c.width = width;
       c.height = height;
       sizeCb.current?.(width, height);
       const ctx = c.getContext("2d")!;
       // Each frame is a patch drawn over the previous picture; a scratch canvas lets it blend.
       const scratch = document.createElement("canvas").getContext("2d")!;
-      const frames = gif.frames.filter((f) => "image" in f) as Parameters<typeof decompressFrame>[0][];
-      if (frames.length === 0) return;
 
       let i = 0;
       let restore: ImageData | null = null;

@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -7,6 +8,8 @@ import { DEFAULT_PROMPT, PROVIDERS, setSetting, updateSetting, useSettings, type
 import { applyTheme, THEMES, themeById } from "../lib/themes";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from "@tauri-apps/plugin-autostart";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import AnimatedImage from "../packs/AnimatedImage";
 import Spirit from "../packs/Spirit";
 import { guessMood } from "../packs/moods";
@@ -154,10 +157,88 @@ function SettingsView({ settings, section, setSection, account }: {
         {section === "Галерея" && <GallerySection />}
         {section === "Аккаунт" && <AccountSection account={account} />}
         {section === "О программе" && (
-          <p className="muted">Familiar 0.1.0 · открытый код, лицензия Apache-2.0.</p>
+<About />
         )}
       </main>
     </div>
+  );
+}
+
+function About() {
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    getVersion().then(setVersion);
+  }, []);
+  return (
+    <>
+      <p className="muted">Familiar {version} · открытый код, лицензия Apache-2.0.</p>
+      <Updates />
+    </>
+  );
+}
+
+/** Signed updates from GitHub Releases (the signature is checked against the key in tauri.conf.json). */
+function Updates() {
+  const [state, setState] = useState<"idle" | "checking" | "none" | "installing">("idle");
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+
+  const look = async () => {
+    setError("");
+    setState("checking");
+    try {
+      const u = await check();
+      setUpdate(u);
+      setState(u ? "idle" : "none");
+    } catch (e) {
+      setError(`не удалось проверить: ${e}`);
+      setState("idle");
+    }
+  };
+  useEffect(() => {
+    look();
+  }, []);
+
+  const install = async () => {
+    if (!update) return;
+    setError("");
+    setState("installing");
+    let total = 0;
+    let got = 0;
+    try {
+      await update.downloadAndInstall((e) => {
+        if (e.event === "Started") total = e.data.contentLength ?? 0;
+        if (e.event === "Progress") {
+          got += e.data.chunkLength;
+          if (total) setProgress(`${Math.round((got / total) * 100)} %`);
+        }
+        if (e.event === "Finished") setProgress("перезапускаю…");
+      });
+      await relaunch();
+    } catch (e) {
+      setError(`не удалось обновить: ${e}`);
+      setState("idle");
+    }
+  };
+
+  return (
+    <>
+      {update ? (
+        <div className="account">
+          <p className="status ok">Доступна версия {update.version}</p>
+          {update.body && <p className="muted">{update.body}</p>}
+          <button className="primary" disabled={state === "installing"} onClick={install}>
+            {state === "installing" ? `Обновляю… ${progress}` : "Обновить и перезапустить"}
+          </button>
+        </div>
+      ) : (
+        <button disabled={state === "checking"} onClick={look}>
+          {state === "checking" ? "Проверяю…" : state === "none" ? "Последняя версия ✓ · проверить ещё" : "Проверить обновления"}
+        </button>
+      )}
+      {error && <p className="status bad">{error}</p>}
+    </>
   );
 }
 

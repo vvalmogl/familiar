@@ -1,9 +1,12 @@
 name: build
 
+# Every push: tests only (cheap). Installers for all three OSes: run by hand from the
+# Actions tab; real releases come from release.yml on a version tag.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -23,6 +26,7 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml
 
   bundle:
+    if: github.event_name == 'workflow_dispatch'
     needs: test
     strategy:
       fail-fast: false
@@ -49,6 +53,11 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libdbus-1-dev
       - run: npm ci
       - uses: tauri-apps/tauri-action@v0
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           args: ${{ matrix.args }}
       - uses: actions/upload-artifact@v4
