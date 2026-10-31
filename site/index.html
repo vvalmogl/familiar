@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Familiar — ИИ-строка с персонажем</title>
+  <meta name="description" content="Нажми ⌥ Пробел — спроси Claude, ChatGPT или Gemini. Ответ появляется прямо поверх окон, а рядом живёт твой персонаж. macOS, Windows, Linux. Бесплатно и с открытым кодом.">
+  <meta property="og:title" content="Familiar — ИИ-строка с персонажем">
+  <meta property="og:description" content="Спроси нейросеть по сочетанию клавиш. Рядом живёт анимированный персонаж.">
+  <meta property="og:image" content="assets/droplet/preview.png">
+  <link rel="icon" href="assets/droplet/preview.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./"><img src="assets/droplet/preview.png" alt=""> Familiar</a>
+    <nav>
+      <a href="#features" data-i18n="nav.features">Возможности</a>
+      <a href="#install" data-i18n="nav.install">Установка</a>
+      <a href="#faq" data-i18n="nav.faq">Вопросы</a>
+      <button class="lang" id="lang" type="button">EN</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-text">
+        <h1 data-i18n="hero.title">Нейросеть по одному нажатию. И&nbsp;друг рядом.</h1>
+        <p class="lead" data-i18n="hero.lead">Нажми <kbd>⌥</kbd> <kbd>Пробел</kbd> — появится строка, как Spotlight. Спроси Claude, ChatGPT или Gemini, и ответ напечатается прямо поверх окон. А рядом живёт анимированный персонаж: думает, пока нейросеть думает, и радуется, когда готово.</p>
+        <div class="cta">
+          <a class="btn primary" id="download" href="https://github.com/vvalmogl/familiar/releases/latest">
+            <span id="download-label" data-i18n="dl.generic">Скачать бесплатно</span>
+          </a>
+          <a class="btn" href="#install" id="other-os" data-i18n="dl.other">Другие системы</a>
+        </div>
+        <p class="small muted" id="dl-note" data-i18n="dl.note">macOS · Windows · Linux. Бесплатно, открытый код.</p>
+      </div>
+
+      <div class="demo" aria-hidden="true">
+        <div class="demo-screen">
+          <div class="demo-character"><img id="droplet" src="assets/droplet/idle-00.png" alt=""></div>
+          <div class="demo-bar">
+            <span class="demo-input" id="demo-input"></span><span class="caret"></span>
+            <span class="chip">Claude</span>
+          </div>
+          <div class="demo-answer" id="demo-answer"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <h2 data-i18n="f.title">Что умеет</h2>
+      <div class="grid">
+        <article><h3 data-i18n="f1.t">Любая твоя нейросеть</h3><p data-i18n="f1.d">Claude, ChatGPT (Codex), Gemini, OpenRouter или локальная Ollama. Работает через твой аккаунт: мы не продаём запросы и не ставим лимиты.</p></article>
+        <article><h3 data-i18n="f2.t">Персонажи и гифки</h3><p data-i18n="f2.d">Встроенные персонажи, галерея паков и свои гифки: перетащи файлы — и мастер соберёт из них персонажа с настроениями.</p></article>
+        <article><h3 data-i18n="f3.t">Не мешает работать</h3><p data-i18n="f3.d">Строка появляется поверх любого окна и исчезает по Esc. Ответы с форматированием и кодом, история разговора, ⌘N — новый чат.</p></article>
+        <article><h3 data-i18n="f4.t">Темы и сочетания клавиш</h3><p data-i18n="f4.d">Девять тем оформления, своё сочетание клавиш, размер персонажа, телепорты по экрану — или спокойный режим.</p></article>
+        <article><h3 data-i18n="f5.t">Приватно</h3><p data-i18n="f5.d">Вопросы идут с твоего компьютера прямо к нейросети. Ключи хранятся в системной связке ключей. Аккаунт не обязателен.</p></article>
+        <article><h3 data-i18n="f6.t">Три системы, открытый код</h3><p data-i18n="f6.d">macOS, Windows и Linux. Исходный код открыт под лицензией Apache-2.0, обновления приходят сами.</p></article>
+      </div>
+    </section>
+
+    <section id="install" class="install">
+      <h2 data-i18n="i.title">Установка</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" data-os="mac" class="on">macOS</button>
+        <button type="button" data-os="win">Windows</button>
+        <button type="button" data-os="linux">Linux</button>
+      </div>
+
+      <div class="os" data-os="mac">
+        <a class="btn primary" data-asset="mac" href="https://github.com/vvalmogl/familiar/releases/latest" data-i18n="i.mac.btn">Скачать для macOS (.dmg)</a>
+        <ol>
+          <li data-i18n="i.mac.1">Открой скачанный файл <b>.dmg</b> и перетащи Familiar в папку «Программы».</li>
+          <li data-i18n="i.mac.2">Запусти Familiar. macOS покажет: «Не удаётся проверить разработчика» — нажми <b>Готово</b>.</li>
+          <li data-i18n="i.mac.3">Открой <b>Системные настройки → Конфиденциальность и безопасность</b>, пролистай вниз и нажми <b>«Всё равно открыть»</b> напротив Familiar.</li>
+          <li data-i18n="i.mac.4">Запусти ещё раз и подтверди. Это нужно только один раз.</li>
+        </ol>
+        <p class="muted small" data-i18n="i.mac.why">Почему так: у Familiar пока нет платной подписи Apple. Код приложения открыт, а обновления подписаны нашим ключом.</p>
+      </div>
+
+      <div class="os" data-os="win" hidden>
+        <a class="btn primary" data-asset="win" href="https://github.com/vvalmogl/familiar/releases/latest" data-i18n="i.win.btn">Скачать для Windows (.exe)</a>
+        <ol>
+          <li data-i18n="i.win.1">Запусти скачанный установщик.</li>
+          <li data-i18n="i.win.2">Если Windows покажет «Система Windows защитила ваш компьютер», нажми <b>Подробнее → Выполнить в любом случае</b>.</li>
+          <li data-i18n="i.win.3">После установки нажми <kbd>Alt</kbd> + <kbd>Пробел</kbd>.</li>
+        </ol>
+      </div>
+
+      <div class="os" data-os="linux" hidden>
+        <a class="btn primary" data-asset="linux" href="https://github.com/vvalmogl/familiar/releases/latest" data-i18n="i.linux.btn">Скачать для Linux (.AppImage)</a>
+        <ol>
+          <li data-i18n="i.linux.1">Сделай файл исполняемым: Свойства → Права → «Разрешить запуск как программу». Или скачай <b>.deb</b> для Ubuntu/Debian на странице релиза.</li>
+          <li data-i18n="i.linux.2">В GNOME на Wayland глобальные сочетания клавиш недоступны приложениям: назначь в настройках системы команду <code>familiar --toggle</code> на удобные клавиши.</li>
+        </ol>
+      </div>
+      <p class="muted small"><a href="https://github.com/vvalmogl/familiar/releases" data-i18n="i.all">Все версии и файлы</a></p>
+    </section>
+
+    <section id="faq" class="faq">
+      <h2 data-i18n="q.title">Вопросы</h2>
+      <details><summary data-i18n="q1.q">Это бесплатно?</summary><p data-i18n="q1.a">Да. Приложение бесплатное и с открытым кодом. Запросы к нейросетям идут через твой собственный аккаунт или ключ — по тем же условиям, что и у самого сервиса. Позже в галерее появятся платные паки персонажей от художников, но всё остальное останется бесплатным.</p></details>
+      <details><summary data-i18n="q2.q">Какие нейросети поддерживаются?</summary><p data-i18n="q2.a">Claude (через Claude Code), ChatGPT (через Codex), Gemini (через Gemini CLI), любой OpenAI-совместимый API — OpenRouter, DeepSeek, Qwen — и локальная Ollama. Familiar сам поможет установить и войти.</p></details>
+      <details><summary data-i18n="q3.q">Вы видите мои вопросы?</summary><p data-i18n="q3.a">Нет. Вопросы и ответы идут напрямую между твоим компьютером и выбранной нейросетью. На наш сервер попадают только почта и настройки, если ты сам создашь аккаунт. Подробнее — в <a href="privacy.html">политике конфиденциальности</a>.</p></details>
+      <details><summary data-i18n="q4.q">Можно своего персонажа?</summary><p data-i18n="q4.a">Да: перетащи гифки или картинки в настройках, раздели их по настроениям (обычное, думает, отвечает, радуется) — и персонаж готов. Готовые паки от других людей ставятся одним файлом .fampack или из галереи.</p></details>
+      <details><summary data-i18n="q5.q">Почему macOS предупреждает при первом запуске?</summary><p data-i18n="q5.a">Подпись Apple стоит $99 в год, и у проекта её пока нет. Приложение безопасно: исходный код открыт, а сборки делаются автоматически на GitHub. Инструкция — в разделе «Установка».</p></details>
+    </section>
+  </main>
+
+  <footer>
+    <span>Familiar · <a href="mailto:familiar@roadmapcli.me">familiar@roadmapcli.me</a></span>
+    <span><a href="privacy.html" data-i18n="foot.privacy">Конфиденциальность</a> · <a href="https://github.com/vvalmogl/familiar">GitHub</a></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
