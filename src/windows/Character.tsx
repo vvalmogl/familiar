@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
+import AnimatedImage from "../packs/AnimatedImage";
 import Spirit from "../packs/Spirit";
 import { hasSolidBackground } from "../packs/card";
 import { isOneShot, nextPack, visualFor } from "../packs/moods";
@@ -191,17 +192,7 @@ export default function Character() {
       {pack.kind === "svg" ? (
         <Spirit mood={mood} />
       ) : (
-        src && (
-          <img
-            src={src}
-            draggable={false}
-            alt=""
-            onLoad={(e) => {
-              const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-              if (w && h) setAspect(w / h);
-            }}
-          />
-        )
+        src && <AnimatedImage src={src} onSize={(w, h) => w && h && setAspect(w / h)} />
       )}
     </div>
   );

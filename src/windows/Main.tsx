@@ -7,6 +7,7 @@ import { DEFAULT_PROMPT, PROVIDERS, setSetting, updateSetting, useSettings, type
 import { applyTheme, THEMES, themeById } from "../lib/themes";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from "@tauri-apps/plugin-autostart";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import AnimatedImage from "../packs/AnimatedImage";
 import Spirit from "../packs/Spirit";
 import { guessMood } from "../packs/moods";
 import { notifyPacksChanged, usePacks } from "../packs/registry";
@@ -209,7 +210,7 @@ const ROTATIONS: { id: Rotation; title: string }[] = [
 
 function PackPreview({ pack }: { pack: Pack }) {
   if (pack.kind === "svg") return <Spirit mood="idle" />;
-  return pack.preview ? <img src={pack.preview} alt="" draggable={false} /> : null;
+  return pack.preview ? <AnimatedImage src={pack.preview} /> : null;
 }
 
 function CharacterSettings({ settings }: { settings: Settings }) {

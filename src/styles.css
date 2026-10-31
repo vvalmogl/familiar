@@ -88,8 +88,8 @@ html[data-window="character"], html[data-window="character"] body {
 
 /* ───────── character ───────── */
 .character { width: 100vw; height: 100vh; cursor: pointer; }
-.character img { width: 100%; height: 100%; object-fit: contain; }
-.character.card img { border: 2px solid var(--frame); border-radius: 18px; object-fit: cover; }
+.character img, .character canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+.character.card img, .character.card canvas { border: 2px solid var(--frame); border-radius: 18px; object-fit: cover; }
 .glitch-in { animation: glitch-in 0.3s ease-out; }
 .glitch-out { animation: glitch-out 0.18s ease-in forwards; }
 @keyframes glitch-in {
@@ -206,7 +206,7 @@ kbd.rec { animation: dot 1s infinite; }
 /* ───────── packs ───────── */
 .pack { padding: 10px; border: 1px solid rgba(127, 127, 140, 0.35); border-radius: 12px; }
 .pack .pack-preview { width: 100%; height: 110px; padding: 4px; display: flex; align-items: center; justify-content: center; }
-.pack .pack-preview img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+.pack .pack-preview img, .pack .pack-preview canvas { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
 .pack-meta { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .pack-meta .muted { font-size: 11px; }
 .pack-actions { display: flex; align-items: center; justify-content: space-between; width: 100%; }
