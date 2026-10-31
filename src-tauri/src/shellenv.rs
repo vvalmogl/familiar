@@ -8,23 +8,45 @@ pub fn home() -> PathBuf {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from).unwrap_or_default()
 }
 
+/// PATH as the user's login shell sets it. Gives up after a few seconds:
+/// a slow or interactive .zshrc must not hang every provider call.
+#[cfg(unix)]
+fn login_shell_path() -> Option<String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let mut child = Command::new(shell)
+        .args(["-lic", "echo __PATH__$PATH"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while child.try_wait().ok()?.is_none() {
+        if Instant::now() > deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let mut out = String::new();
+    child.stdout.take()?.read_to_string(&mut out).ok()?;
+    // Only trust output that carries our marker; rc files may print anything before it.
+    out.rsplit_once("__PATH__").map(|(_, p)| p.trim().to_string())
+}
+
 static PATH: Lazy<String> = Lazy::new(|| {
     let sep = if cfg!(windows) { ";" } else { ":" };
     let mut parts: Vec<String> = Vec::new();
 
     #[cfg(unix)]
     {
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-        if let Ok(out) = std::process::Command::new(shell)
-            .args(["-lic", "echo __PATH__$PATH"])
-            .stdin(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()
-        {
-            let s = String::from_utf8_lossy(&out.stdout);
-            if let Some(p) = s.rsplit("__PATH__").next() {
-                parts.push(p.trim().to_string());
-            }
+        if let Some(p) = login_shell_path() {
+            parts.push(p);
         }
         let h = home();
         for extra in [".local/familiar-node/bin", ".local/gemini-node/bin", ".local/bin", ".npm-global/bin"] {

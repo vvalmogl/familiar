@@ -55,7 +55,7 @@ export default function ProviderSetup({ kind }: { kind: CliKind }) {
         // Straight on to signing in.
         const s = await invoke<CliStatus>("cli_status", { kind });
         setStatus(s);
-        if (s.installed && s.loggedIn === false) return run("login");
+        if (s.installed && s.loggedIn === false) return await run("login");
       }
     } catch (e) {
       setError(String(e));

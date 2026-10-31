@@ -16,19 +16,22 @@ impl CliProvider for Claude {
 
     fn arguments(&self, req: &AskRequest, session_id: Option<&str>) -> Vec<String> {
         let mut args: Vec<String> = [
-            "-p", &req.prompt, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+            "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--tools", "WebSearch,WebFetch", "--allowedTools", "WebSearch,WebFetch", "--strict-mcp-config",
-            "--append-system-prompt", &req.system_prompt,
         ]
         .iter()
         .map(|s| s.to_string())
         .collect();
+        // `=` form so a system prompt starting with '-' is not read as a flag.
+        args.push(format!("--append-system-prompt={}", req.system_prompt));
         if let Some(model) = req.model.as_deref().filter(|m| !m.is_empty()) {
             args.extend(["--model".into(), model.into()]);
         }
         if let Some(id) = session_id {
             args.extend(["--resume".into(), id.into()]);
         }
+        // After `--` so a prompt like "-5 °C…" stays a prompt.
+        args.extend(["--".into(), req.prompt.clone()]);
         args
     }
 
@@ -99,6 +102,21 @@ mod tests {
         };
         assert!(!Claude.arguments(&req, None).contains(&"--resume".to_string()));
         let args = Claude.arguments(&req, Some("s1"));
-        assert_eq!(&args[args.len() - 2..], ["--resume", "s1"]);
+        assert!(args.windows(2).any(|w| w == ["--resume", "s1"]));
+    }
+
+    #[test]
+    fn prompt_starting_with_dash_stays_a_prompt() {
+        let req = AskRequest {
+            provider: super::super::ProviderKind::Claude,
+            prompt: "-5 °C в Фаренгейтах?".into(),
+            conversation: "c".into(),
+            model: None,
+            system_prompt: "-sp".into(),
+            api_base_url: None,
+        };
+        let args = Claude.arguments(&req, None);
+        assert_eq!(&args[args.len() - 2..], ["--", "-5 °C в Фаренгейтах?"]);
+        assert!(args.contains(&"--append-system-prompt=-sp".to_string()));
     }
 }

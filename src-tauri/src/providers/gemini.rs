@@ -20,12 +20,12 @@ impl CliProvider for Gemini {
             None => format!("{}\n\n{}", req.system_prompt, req.prompt),
         };
         // Read-only "plan" mode (no shell or file writes), no extensions, no MCP servers.
-        let mut args: Vec<String> = [
-            "-p", &prompt, "--output-format", "stream-json", "--approval-mode", "plan",
-            "--extensions", "none", "--allowed-mcp-server-names", "none",
-        ]
-        .map(String::from)
-        .to_vec();
+        // `=` form so a prompt starting with '-' is not read as a flag.
+        let mut args: Vec<String> = vec![format!("--prompt={prompt}")];
+        args.extend(
+            ["--output-format", "stream-json", "--approval-mode", "plan", "--extensions", "none", "--allowed-mcp-server-names", "none"]
+                .map(String::from),
+        );
         if let Some(model) = req.model.as_deref().filter(|m| !m.is_empty()) {
             args.extend(["-m".into(), model.into()]);
         }

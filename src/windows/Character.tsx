@@ -73,7 +73,7 @@ export default function Character() {
         if (isOneShot(mood)) return; // hold the last frame; the mood timer brings us back to idle
         i = 0;
       }
-      timer = setTimeout(step, ms);
+      timer = setTimeout(step, Math.max(ms, 16)); // a 0 ms frame would spin the CPU
     };
     step();
     return () => clearTimeout(timer);

@@ -36,6 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(providers::Providers::default())
         .manage(windows::HotkeyState::default())
+        .manage(windows::PendingAuth::default())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -105,6 +106,7 @@ pub fn run() {
             windows::open_main,
             windows::set_hotkey,
             windows::hotkey_status,
+            windows::take_auth_callback,
             packs::allow_previews,
             packs::install_pack_from_url,
             setup::cli_status,

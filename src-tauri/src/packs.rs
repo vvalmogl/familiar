@@ -107,6 +107,9 @@ impl Manifest {
         if !valid_id(&self.id) {
             return Err(format!("неверный id пака «{}»: только a-z, 0-9, точка, дефис", self.id));
         }
+        if self.id.starts_with("builtin.") {
+            return Err("id «builtin.…» зарезервирован для встроенных персонажей".into());
+        }
         if self.name.trim().is_empty() {
             return Err("у пака нет названия".into());
         }
@@ -350,7 +353,14 @@ fn manifest_root(dir: &Path) -> Option<PathBuf> {
     if dir.join("pack.json").is_file() {
         return Some(dir.to_path_buf());
     }
-    let subs: Vec<PathBuf> = fs::read_dir(dir).ok()?.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    // Finder's "Compress" adds __MACOSX/ next to the real folder.
+    let subs: Vec<PathBuf> = fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n != "__MACOSX" && !n.starts_with('.')))
+        .collect();
     match subs.as_slice() {
         [only] if only.join("pack.json").is_file() => Some(only.clone()),
         _ => None,
@@ -358,7 +368,9 @@ fn manifest_root(dir: &Path) -> Option<PathBuf> {
 }
 
 /// Install a pack from a folder or a `.fampack`/`.zip` into `root`, replacing an older copy.
-pub fn install(root: &Path, source: &Path, stamp: u128) -> Result<Manifest, String> {
+/// `expect_id` (gallery installs) refuses a pack whose pack.json claims another id,
+/// so a download can never replace an unrelated pack.
+pub fn install(root: &Path, source: &Path, stamp: u128, expect_id: Option<&str>) -> Result<Manifest, String> {
     let staging = root.join(format!(".import-{stamp:x}"));
     let _ = fs::remove_dir_all(&staging);
     let result = (|| {
@@ -370,6 +382,9 @@ pub fn install(root: &Path, source: &Path, stamp: u128) -> Result<Manifest, Stri
         }
         let pack_dir = manifest_root(&staging).ok_or("в паке нет pack.json")?;
         let m = Manifest::read(&pack_dir)?;
+        if expect_id.is_some_and(|id| id != m.id) {
+            return Err(format!("id в pack.json («{}») не совпадает с паком из галереи", m.id));
+        }
         let target = root.join(&m.id);
         if target.exists() {
             fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
@@ -393,22 +408,34 @@ const MAX_DOWNLOAD_BYTES: u64 = 50 * 1024 * 1024;
 
 /// Download a `.fampack` from the gallery (HTTPS only, size-capped) and install it.
 #[tauri::command]
-pub async fn install_pack_from_url(app: AppHandle, url: String) -> Result<String, String> {
+pub async fn install_pack_from_url(app: AppHandle, url: String, pack_id: String) -> Result<String, String> {
     use futures_util::StreamExt;
     use std::io::Write;
     if !url.starts_with("https://") {
         return Err("пак можно скачать только по https".into());
     }
-    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    // Redirects must stay on https too.
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::custom(|a| {
+            if a.url().scheme() == "https" && a.previous().len() < 5 { a.follow() } else { a.stop() }
+        }))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if resp.url().scheme() != "https" {
+        return Err("пак можно скачать только по https".into());
+    }
     if !resp.status().is_success() {
         return Err(format!("сервер ответил {}", resp.status()));
     }
     if resp.content_length().is_some_and(|n| n > MAX_DOWNLOAD_BYTES) {
         return Err("пак слишком большой".into());
     }
-    let tmp = std::env::temp_dir().join(format!("familiar-download-{}.fampack", stamp()));
+    // Inside our own data folder (not the shared /tmp) and never over an existing file.
+    let root = user_dir(&app)?;
+    let tmp = root.join(format!(".download-{:x}.fampack", stamp()));
     let result = async {
-        let mut file = fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&tmp).map_err(|e| e.to_string())?;
         let mut total: u64 = 0;
         let mut stream = resp.bytes_stream();
         while let Some(chunk) = stream.next().await {
@@ -420,7 +447,7 @@ pub async fn install_pack_from_url(app: AppHandle, url: String) -> Result<String
             file.write_all(&chunk).map_err(|e| e.to_string())?;
         }
         drop(file);
-        Ok(install(&user_dir(&app)?, &tmp, stamp())?.id)
+        Ok(install(&root, &tmp, stamp(), Some(&pack_id))?.id)
     }
     .await;
     let _ = fs::remove_file(&tmp);
@@ -444,7 +471,7 @@ pub fn import_gifs(app: AppHandle, name: String, files: Vec<ImportFile>) -> Resu
 
 #[tauri::command]
 pub fn import_pack(app: AppHandle, path: String) -> Result<String, String> {
-    Ok(install(&user_dir(&app)?, Path::new(&path), stamp())?.id)
+    Ok(install(&user_dir(&app)?, Path::new(&path), stamp(), None)?.id)
 }
 
 #[tauri::command]
@@ -526,7 +553,7 @@ mod tests {
         let src = tempfile::tempdir().unwrap();
         sample(src.path());
         let root = tempfile::tempdir().unwrap();
-        assert_eq!(install(root.path(), src.path(), 1).unwrap().id, "author.cat");
+        assert_eq!(install(root.path(), src.path(), 1, None).unwrap().id, "author.cat");
         assert!(root.path().join("author.cat/pack.json").is_file());
 
         // Zip with the pack inside a top-level folder.
@@ -538,9 +565,13 @@ mod tests {
                 z.start_file(format!("cat/{f}"), opts).unwrap();
                 z.write_all(&fs::read(src.path().join(f)).unwrap()).unwrap();
             }
+            // Finder's "Compress" adds this; it must not hide the real folder.
+            z.start_file("__MACOSX/cat/._pack.json", opts).unwrap();
             z.finish().unwrap();
         }
-        assert_eq!(install(root.path(), &zip_path, 2).unwrap().id, "author.cat");
+        assert_eq!(install(root.path(), &zip_path, 2, None).unwrap().id, "author.cat");
+        // A gallery download must carry the id it was listed under.
+        assert!(install(root.path(), &zip_path, 4, Some("other.pack")).unwrap_err().contains("не совпадает"));
         assert!(fs::read_dir(root.path()).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().starts_with(".import")));
 
         let evil = src.path().join("evil.fampack");
@@ -550,7 +581,7 @@ mod tests {
             z.write_all(b"x").unwrap();
             z.finish().unwrap();
         }
-        assert!(install(root.path(), &evil, 3).unwrap_err().contains("недопустимый"));
+        assert!(install(root.path(), &evil, 3, None).unwrap_err().contains("недопустимый"));
         assert!(!root.path().parent().unwrap().join("escape.gif").exists());
     }
 

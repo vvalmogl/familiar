@@ -22,15 +22,40 @@ export function decide(localChangedAt: number, remoteUpdatedAt: number | null): 
 }
 
 const CHANGED_KEY = "familiar.settingsChangedAt";
+const USER_KEY = "familiar.syncedUser";
 const localChangedAt = () => Number(localStorage.getItem(CHANGED_KEY) ?? 0);
 const markChanged = (t: number) => localStorage.setItem(CHANGED_KEY, String(t));
+
+/** Values just pulled from the server: their change events are echoes, not user edits. */
+const pulled = new Map<string, string>();
+let onLocalEdit: (() => void) | undefined;
+let tracking: Promise<void> | undefined;
+
+/**
+ * Note when synced settings change on this machine — signed in or not — so the next sign-in
+ * knows whether local or server settings are newer. Safe to call more than once.
+ */
+export function trackLocalEdits(): Promise<void> {
+  tracking ??= store().then((s) =>
+    s.onChange((key, value) => {
+      if (!(SYNCED_KEYS as readonly string[]).includes(key)) return;
+      if (pulled.get(key) === JSON.stringify(value)) {
+        pulled.delete(key);
+        return;
+      }
+      markChanged(Date.now());
+      onLocalEdit?.();
+    }).then(() => {}),
+  );
+  return tracking;
+}
 
 /**
  * Keep settings in sync with the signed-in account while it lasts.
  * Returns a function that stops syncing.
  */
 export async function startSync(sb: SupabaseClient, userId: string, onStatus: (s: string) => void): Promise<() => void> {
-  let applying = false;
+  await trackLocalEdits();
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const push = async () => {
@@ -43,36 +68,37 @@ export async function startSync(sb: SupabaseClient, userId: string, onStatus: (s
     onStatus(error ? `не удалось сохранить: ${error.message}` : `синхронизировано ${new Date().toLocaleTimeString()}`);
   };
 
-  // First contact: whichever side changed last wins.
+  // First contact: whichever side changed last wins. Local edits made under another account
+  // (or never synced) don't count, so they can't overwrite this account's settings.
   const { data, error } = await sb.from("user_settings").select("settings, updated_at").eq("user_id", userId).maybeSingle();
   if (error) {
     onStatus(`нет связи с сервером: ${error.message}`);
   } else {
     const remoteAt = data ? Date.parse(data.updated_at) : null;
-    const action = decide(localChangedAt(), remoteAt);
+    const sameUser = localStorage.getItem(USER_KEY) === userId;
+    const action = sameUser ? decide(localChangedAt(), remoteAt) : remoteAt === null ? "push" : "pull";
     if (action === "push") await push();
     if (action === "pull" && data) {
-      applying = true;
       for (const k of SYNCED_KEYS) {
         const v = (data.settings as Record<string, unknown>)[k];
-        if (v !== undefined) await setSetting(k, v as never);
+        if (v === undefined) continue;
+        pulled.set(k, JSON.stringify(v));
+        await setSetting(k, v as never);
       }
-      applying = false;
       markChanged(remoteAt!);
       onStatus("настройки загружены из аккаунта");
     }
     if (action === "none") onStatus("синхронизировано");
+    localStorage.setItem(USER_KEY, userId);
   }
 
   // Afterwards: push local edits (debounced).
-  const unlisten = await (await store()).onChange((key) => {
-    if (applying || !(SYNCED_KEYS as readonly string[]).includes(key)) return;
-    markChanged(Date.now());
+  onLocalEdit = () => {
     clearTimeout(timer);
     timer = setTimeout(push, 1500);
-  });
+  };
   return () => {
     clearTimeout(timer);
-    unlisten();
+    onLocalEdit = undefined;
   };
 }

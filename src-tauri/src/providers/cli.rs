@@ -56,9 +56,16 @@ pub async fn run(
 
     let mut state = ParseState { session_id: session.session_id.clone(), ..Default::default() };
     let mut saw_text = false;
-    let mut lines = BufReader::new(child.stdout.take().expect("piped stdout")).lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        let Ok(obj) = serde_json::from_str::<Value>(&line) else { continue };
+    // Raw lines (not `lines()`): one non-UTF-8 line must not stop reading and leave the pipe full.
+    let mut stdout = BufReader::new(child.stdout.take().expect("piped stdout"));
+    let mut raw = Vec::new();
+    loop {
+        raw.clear();
+        match stdout.read_until(b'\n', &mut raw).await {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
+        }
+        let Ok(obj) = serde_json::from_slice::<Value>(&raw) else { continue };
         for ev in provider.parse(&obj, &mut state) {
             let stop = ev == Event::Done;
             if matches!(ev, Event::Text { .. }) {

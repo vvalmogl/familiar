@@ -28,6 +28,7 @@
     "dialog:default",
     "core:path:default",
     "core:webview:default",
-    "deep-link:default"
+    "deep-link:default",
+    "autostart:default"
   ]
 }

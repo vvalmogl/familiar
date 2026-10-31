@@ -56,14 +56,15 @@ pub async fn run(req: &AskRequest, mut session: Session, send: &(dyn Fn(Event) +
     }
 
     let mut answer = String::new();
-    let mut buffer = String::new();
+    // Bytes, not String: a multi-byte letter may be split between two chunks.
+    let mut buffer: Vec<u8> = Vec::new();
     let mut stream = response.bytes_stream();
     'outer: while let Some(chunk) = stream.next().await {
         let Ok(chunk) = chunk else { break };
-        buffer.push_str(&String::from_utf8_lossy(&chunk));
-        while let Some(nl) = buffer.find('\n') {
-            let line: String = buffer.drain(..=nl).collect();
-            match parse_sse_line(line.trim()) {
+        buffer.extend_from_slice(&chunk);
+        while let Some(nl) = buffer.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = buffer.drain(..=nl).collect();
+            match parse_sse_line(String::from_utf8_lossy(&line).trim()) {
                 SseLine::Done => break 'outer,
                 SseLine::Text(t) => {
                     answer.push_str(&t);

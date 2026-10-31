@@ -110,9 +110,20 @@ pub fn open_main(app: AppHandle, section: Option<String>) {
 /// Route `familiar://…` links: sign-in callbacks go to the main window.
 pub fn handle_deep_link(app: &AppHandle, url: &str) {
     if url.starts_with("familiar://auth-callback") {
+        // Kept until the page takes it: on a cold start the event fires before any listener exists.
+        *app.state::<PendingAuth>().0.lock().unwrap() = Some(url.to_string());
         open_main(app.clone(), Some("account".into()));
-        let _ = app.emit_to("main", "auth:callback", url.to_string());
+        let _ = app.emit_to("main", "auth:callback", ());
     }
+}
+
+#[derive(Default)]
+pub struct PendingAuth(std::sync::Mutex<Option<String>>);
+
+/// The last sign-in link the browser opened, handed out once.
+#[tauri::command]
+pub fn take_auth_callback(state: tauri::State<'_, PendingAuth>) -> Option<String> {
+    state.0.lock().unwrap().take()
 }
 
 /// Replace the global hotkey. Fails (and keeps the old one) if the combo is invalid or taken.

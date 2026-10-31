@@ -49,8 +49,9 @@ export default function Bar() {
       win.outerSize(),
       currentMonitor(),
     ]);
-    const area = monitor?.workArea ?? { position: monitor!.position, size: monitor!.size };
-    const msf = monitor?.scaleFactor ?? sf;
+    if (!monitor) return;
+    const area = monitor.workArea ?? { position: monitor.position, size: monitor.size };
+    const msf = monitor.scaleFactor ?? sf;
     await emitTo("character", "bar:frame", {
       bar: { x: pos.x / sf, y: pos.y / sf, w: size.width / sf, h: size.height / sf },
       screen: {

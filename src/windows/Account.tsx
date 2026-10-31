@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { handleAuthCallback, signInWith, signInWithEmail, signOut, supabase, useSession } from "../lib/account";
-import { startSync } from "../lib/sync";
+import { startSync, trackLocalEdits } from "../lib/sync";
 import { notifyPacksChanged, usePacks } from "../packs/registry";
 
 /** Finish sign-in from deep links and keep settings synced while signed in. Mount once in the main window. */
@@ -12,10 +12,16 @@ export function useAccount() {
   const [authError, setAuthError] = useState("");
 
   useEffect(() => {
-    const un = listen<string>("auth:callback", ({ payload }) => {
+    // Pull rather than trust the event: a link that launched the app arrived before this listener.
+    const take = async () => {
+      const link = await invoke<string | null>("take_auth_callback");
+      if (!link) return;
       setAuthError("");
-      handleAuthCallback(payload).catch((e) => setAuthError(String(e.message ?? e)));
-    });
+      await handleAuthCallback(link).catch((e) => setAuthError(String(e.message ?? e)));
+    };
+    take();
+    trackLocalEdits();
+    const un = listen("auth:callback", take);
     return () => void un.then((f) => f());
   }, []);
 
@@ -122,7 +128,7 @@ export function GallerySection() {
     try {
       const { data, error } = await supabase!.functions.invoke<{ url: string }>("pack-download", { body: { pack_id: p.id } });
       if (error || !data) throw error ?? new Error("нет ссылки");
-      await invoke("install_pack_from_url", { url: data.url });
+      await invoke("install_pack_from_url", { url: data.url, packId: p.id });
       await notifyPacksChanged();
     } catch (e) {
       setError(String((e as Error).message ?? e));

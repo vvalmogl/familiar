@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { prettyHotkey, toAccelerator } from "../lib/hotkey";
 import { DEFAULT_PROMPT, PROVIDERS, setSetting, updateSetting, useSettings, type Settings } from "../lib/settings";
 import { applyTheme, THEMES, themeById } from "../lib/themes";
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from "@tauri-apps/plugin-autostart";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import Spirit from "../packs/Spirit";
 import { guessMood } from "../packs/moods";
@@ -83,6 +84,8 @@ function Onboarding({ settings, onDone }: { settings: Settings; onDone: () => vo
   const last = step === steps.length - 1;
   const finish = async () => {
     await setSetting("onboarded", true);
+    // A hotkey app is only useful if it is already running; it can be turned off in settings.
+    await enableAutostart().catch(() => {});
     onDone();
     await getCurrentWindow().hide();
   };
@@ -144,6 +147,7 @@ function SettingsView({ settings, section, setSection, account }: {
             <p className="muted">
               В строке: Enter — спросить · Esc — скрыть · ⌘/Ctrl+N — новый чат · ⌘/Ctrl+1…4 — нейросеть · ⌘/Ctrl+, — настройки
             </p>
+            <AutostartToggle />
           </>
         )}
         {section === "Галерея" && <GallerySection />}
@@ -153,6 +157,32 @@ function SettingsView({ settings, section, setSection, account }: {
         )}
       </main>
     </div>
+  );
+}
+
+function AutostartToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    autostartEnabled().then(setOn, (e) => setError(String(e)));
+  }, []);
+  const toggle = async (next: boolean) => {
+    setError("");
+    try {
+      await (next ? enableAutostart() : disableAutostart());
+      setOn(await autostartEnabled());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+  return (
+    <>
+      <label className="check">
+        <input type="checkbox" checked={!!on} disabled={on === null} onChange={(e) => toggle(e.target.checked)} />
+        Запускать вместе с системой
+      </label>
+      {error && <p className="status bad">{error}</p>}
+    </>
   );
 }
 
