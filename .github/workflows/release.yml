@@ -3,9 +3,15 @@ name: release
 # Push a tag like v0.1.0 → installers for macOS, Windows and Linux are built, signed for the
 # updater and attached to a draft GitHub Release together with latest.json. Publish the draft
 # by hand after a quick check; the app's updater only sees published releases.
+# Manual run (Actions → release → Run workflow) rebuilds chosen platforms of an existing tag, e.g. when
+# GitHub has no macOS arm64 capacity: tag v0.1.1, platforms mac.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag: { description: "Existing tag to build", required: true }
+      platforms: { description: "Comma-separated: mac, win, linux", required: true, default: "mac,win,linux" }
 
 permissions:
   contents: write
@@ -16,27 +22,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: --target universal-apple-darwin
-          - platform: windows-latest
-            args: ""
-          - platform: ubuntu-22.04
-            args: ""
+          # Intel runner builds the universal app too and is rarely short on capacity, unlike macos-latest (arm64).
+          - { id: mac, platform: macos-15-intel, args: --target universal-apple-darwin }
+          - { id: win, platform: windows-latest, args: "" }
+          - { id: linux, platform: ubuntu-22.04, args: "" }
     runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      SKIP: ${{ github.event_name == 'workflow_dispatch' && !contains(inputs.platforms, matrix.id) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: 22, cache: npm }
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (2026-10-31)
+      - if: env.SKIP == 'true'
+        run: echo "skipped"
+      - if: env.SKIP != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          ref: ${{ env.TAG }}
+      - if: env.SKIP != 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22, cache: npm }
+      - if: env.SKIP != 'true'
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (2026-10-31)
+        with:
+          targets: ${{ matrix.id == 'mac' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - name: Linux deps
-        if: matrix.platform == 'ubuntu-22.04'
+        if: env.SKIP != 'true' && matrix.id == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libdbus-1-dev
-      - run: npm ci
-      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0 (2026-10-31)
+      - if: env.SKIP != 'true'
+        run: npm ci
+      - if: env.SKIP != 'true'
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0 (2026-10-31)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -44,8 +60,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Familiar ${{ github.ref_name }}
+          tagName: ${{ env.TAG }}
+          releaseName: Familiar ${{ env.TAG }}
           releaseBody: "Установка: см. README → «Установка». Install notes: README → Install."
           releaseDraft: true
           prerelease: false
