@@ -45,6 +45,14 @@ pub fn run() {
 
             windows::setup_tray(app.handle())?;
 
+            // On Windows and Linux showing the companion would activate it and steal focus from the
+            // bar, whose blur handler then hides it again: the bar flickers instead of opening.
+            // A non-focusable window still gets clicks. (macOS uses orderFrontRegardless instead.)
+            #[cfg(not(target_os = "macos"))]
+            if let Some(character) = tauri::Manager::get_webview_window(app, "character") {
+                let _ = character.set_focusable(false);
+            }
+
             // familiar://auth-callback?code=… returns from the browser after signing in.
             {
                 use tauri_plugin_deep_link::DeepLinkExt;

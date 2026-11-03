@@ -30,3 +30,4 @@ packs/local/
 !.env.example
 packs/gallery/*/build
 __pycache__/
+packs/gallery/build/

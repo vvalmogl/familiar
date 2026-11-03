@@ -78,7 +78,12 @@ export default function Bar() {
   useEffect(() => {
     const un = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) hadFocus.current = true;
-      else if (hadFocus.current) invoke("hide_bar");
+      // Windows reports short blurs while a window is being shown and activated (e.g. on Alt
+      // release after Alt+Space); hide only if the bar is still unfocused a moment later.
+      else if (hadFocus.current)
+        setTimeout(async () => {
+          if (!(await getCurrentWindow().isFocused())) invoke("hide_bar");
+        }, 150);
     });
     return () => void un.then((f) => f());
   }, []);

@@ -1,6 +1,6 @@
 [package]
 name = "familiar"
-version = "0.1.1"
+version = "0.1.2"
 description = "AI quick bar with an animated companion"
 authors = ["Familiar contributors"]
 license = "Apache-2.0"
