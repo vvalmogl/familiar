@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import AnimatedImage from "../packs/AnimatedImage";
@@ -46,6 +46,11 @@ export default function Character() {
   const pack = packs.find((p) => p.id === packId) ?? SPIRIT;
   const packsRef = useRef(packs);
   packsRef.current = packs;
+
+  // The bar's placeholder names whoever is on screen ("Спроси — Котик ответит…").
+  useEffect(() => {
+    emitTo("bar", "character:pack", pack.name);
+  }, [pack.name]);
 
   function rotate() {
     const s = settingsRef.current;

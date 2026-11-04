@@ -236,3 +236,29 @@ select { font: inherit; color: inherit; background: rgba(127, 127, 140, 0.08); b
 .account p { margin: 8px 0; }
 .gallery-pack .pack-preview img { width: 100%; height: 100%; object-fit: contain; }
 .gallery-pack button { margin-top: auto; align-self: stretch; }
+
+/* ───────── sign-in ───────── */
+.signin { max-width: 420px; }
+.signin-head h3 { margin: 0 0 4px; font-size: 18px; }
+.signin-head p { margin: 0 0 18px; }
+.oauth { display: flex; flex-direction: column; gap: 10px; }
+.oauth-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 42px; border-radius: 10px; font-weight: 600; transition: filter 0.15s, transform 0.1s;
+}
+.oauth-btn:hover { filter: brightness(0.97); }
+.oauth-btn:active { transform: translateY(1px); }
+.oauth-btn.google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; }
+.oauth-btn.github { background: #24292f; color: #fff; border: 1px solid #24292f; }
+html[data-dark="true"] .oauth-btn.github { background: #f0f2f5; color: #1f2328; border-color: #f0f2f5; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; font-size: 13px; opacity: 0.6; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: rgba(127, 127, 140, 0.35); }
+.email-row { display: flex; gap: 8px; }
+.email-row input { flex: 1; height: 40px; }
+.email-row button { height: 40px; white-space: nowrap; }
+.signin .small { font-size: 12px; }
+.signin > .small { margin-top: 16px; }
+.profile { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: rgba(127, 127, 140, 0.08); }
+.profile img, .profile .avatar { width: 44px; height: 44px; border-radius: 50%; flex: none; }
+.profile .avatar { display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 18px; }
+.profile > div { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Markdown from "react-markdown";
 import { PROVIDERS, setSetting, useSettings, type ProviderKind } from "../lib/settings";
 import { applyTheme, themeById } from "../lib/themes";
+import { usePacks } from "../packs/registry";
 import type { Mood } from "../packs/types";
 
 type ProviderEvent =
@@ -28,6 +29,14 @@ const mood = (m: Mood) => emitTo("character", "character:mood", m);
 /** Spotlight-style prompt: Enter sends, Esc hides, ⌘/Ctrl+N new chat, ⌘/Ctrl+1…4 switch AI. */
 export default function Bar() {
   const settings = useSettings();
+  // Name of the character on screen; the companion window reports rotations.
+  const packs = usePacks();
+  const [shownName, setShownName] = useState<string | null>(null);
+  useEffect(() => {
+    const un = listen<string>("character:pack", (e) => setShownName(e.payload));
+    return () => void un.then((f) => f());
+  }, []);
+  const characterName = shownName ?? packs.find((p) => p.id === settings?.packId)?.name;
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -208,7 +217,7 @@ export default function Bar() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Спроси что угодно…"
+          placeholder={characterName ? `Спроси — ${characterName} ответит…` : "Спроси что угодно…"}
           spellCheck={false}
         />
         <button className="pill" onClick={cycleProvider} title="Сменить нейросеть (⌘1…⌘4)">

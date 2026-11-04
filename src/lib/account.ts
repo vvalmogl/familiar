@@ -30,6 +30,15 @@ export async function signInWith(provider: "google" | "github") {
   await openUrl(data.url);
 }
 
+/** OAuth providers switched on in the Supabase project (a provider without keys would only fail). */
+export async function enabledProviders(): Promise<Set<string>> {
+  if (!url || !key) return new Set();
+  const r = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } });
+  if (!r.ok) return new Set(["github"]);
+  const { external } = (await r.json()) as { external: Record<string, boolean> };
+  return new Set(Object.keys(external).filter((k) => external[k]));
+}
+
 export async function signInWithEmail(email: string) {
   const { error } = await client().auth.signInWithOtp({ email, options: { emailRedirectTo: REDIRECT } });
   if (error) throw error;
