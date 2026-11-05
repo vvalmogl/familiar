@@ -20,15 +20,16 @@ const GLOBAL_PER_WINDOW = 300;
 let globalHits: number[] = [];
 function limited(ip: string): boolean {
   const now = Date.now();
-  globalHits = globalHits.filter((t) => now - t < WINDOW_MS);
-  if (globalHits.length >= GLOBAL_PER_WINDOW) return true;
-  globalHits.push(now);
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
   hits.delete(ip); // re-insert so Map order stays least-recently-used first
   hits.set(ip, recent);
   if (hits.size > 10_000) hits.delete(hits.keys().next().value!); // evict the stalest client only
-  return recent.length > PER_WINDOW;
+  if (recent.length > PER_WINDOW) return true; // over its own limit: don't spend the shared budget
+  globalHits = globalHits.filter((t) => now - t < WINDOW_MS);
+  if (globalHits.length >= GLOBAL_PER_WINDOW) return true;
+  globalHits.push(now);
+  return false;
 }
 
 Deno.serve(async (req) => {
