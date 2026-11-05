@@ -18,16 +18,22 @@ const hits = new Map<string, number[]>();
 function limited(ip: string): boolean {
   const now = Date.now();
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (!hits.has(ip) && hits.size >= 10_000) {
+    // Drop only expired entries; if the table is still full, refuse newcomers rather than reset everyone.
+    for (const [k, ts] of hits) if (ts.every((t) => now - t >= WINDOW_MS)) hits.delete(k);
+    if (hits.size >= 10_000) return true;
+  }
   recent.push(now);
   hits.set(ip, recent);
-  if (hits.size > 10_000) hits.clear();
   return recent.length > PER_WINDOW;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  // The platform's edge sets cf-connecting-ip; otherwise trust only the entry our proxy appended (the
+  // rightmost), since a client can put anything at the front of X-Forwarded-For.
+  const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",").pop()?.trim() ?? "unknown";
   if (limited(ip)) return json({ error: "слишком много запросов, попробуй через минуту" }, 429);
   const key = Deno.env.get("KLIPY_KEY");
   if (!key) return json({ error: "поиск гифок ещё не настроен" }, 503);
