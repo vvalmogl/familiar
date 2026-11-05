@@ -18,13 +18,10 @@ const hits = new Map<string, number[]>();
 function limited(ip: string): boolean {
   const now = Date.now();
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (!hits.has(ip) && hits.size >= 10_000) {
-    // Drop only expired entries; if the table is still full, refuse newcomers rather than reset everyone.
-    for (const [k, ts] of hits) if (ts.every((t) => now - t >= WINDOW_MS)) hits.delete(k);
-    if (hits.size >= 10_000) return true;
-  }
   recent.push(now);
+  hits.delete(ip); // re-insert so Map order stays least-recently-used first
   hits.set(ip, recent);
+  if (hits.size > 10_000) hits.delete(hits.keys().next().value!); // evict the stalest client only
   return recent.length > PER_WINDOW;
 }
 
