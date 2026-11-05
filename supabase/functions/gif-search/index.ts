@@ -15,8 +15,14 @@ type Item = { id: number | string; slug?: string; title?: string; file?: Partial
 const WINDOW_MS = 60_000;
 const PER_WINDOW = 20;
 const hits = new Map<string, number[]>();
+// Instance-wide budget: bounds KLIPY usage even if per-IP keys are spoofed or evicted.
+const GLOBAL_PER_WINDOW = 300;
+let globalHits: number[] = [];
 function limited(ip: string): boolean {
   const now = Date.now();
+  globalHits = globalHits.filter((t) => now - t < WINDOW_MS);
+  if (globalHits.length >= GLOBAL_PER_WINDOW) return true;
+  globalHits.push(now);
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
   hits.delete(ip); // re-insert so Map order stays least-recently-used first
