@@ -449,5 +449,6 @@ enabled = true
 [functions.pack-download]
 verify_jwt = false
 
+# Callers need the app's anon (or a user) JWT; the function also rate-limits per IP.
 [functions.gif-search]
-verify_jwt = false
+verify_jwt = true

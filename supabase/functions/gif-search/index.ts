@@ -11,9 +11,24 @@ type Media = { url: string; width: number; height: number; size?: number };
 type Sizes = Partial<Record<"gif" | "webp" | "jpg" | "mp4" | "webm", Media>>;
 type Item = { id: number | string; slug?: string; title?: string; file?: Partial<Record<"hd" | "md" | "sm" | "xs", Sizes>> };
 
+// Best-effort per-IP limit (per function instance) so one client can't burn the shared KLIPY quota.
+const WINDOW_MS = 60_000;
+const PER_WINDOW = 20;
+const hits = new Map<string, number[]>();
+function limited(ip: string): boolean {
+  const now = Date.now();
+  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  recent.push(now);
+  hits.set(ip, recent);
+  if (hits.size > 10_000) hits.clear();
+  return recent.length > PER_WINDOW;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  if (limited(ip)) return json({ error: "слишком много запросов, попробуй через минуту" }, 429);
   const key = Deno.env.get("KLIPY_KEY");
   if (!key) return json({ error: "поиск гифок ещё не настроен" }, 503);
 
