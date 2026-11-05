@@ -17,6 +17,7 @@ import { notifyPacksChanged, usePacks } from "../packs/registry";
 import { MOODS, type Mood, type Pack, type Rotation } from "../packs/types";
 import ProviderSetup from "./ProviderSetup";
 import { AccountSection, GallerySection, useAccount } from "./Account";
+import GifSearch from "./GifSearch";
 
 type View = "onboarding" | "settings";
 
@@ -297,6 +298,7 @@ function PackPreview({ pack }: { pack: Pack }) {
 function CharacterSettings({ settings }: { settings: Settings }) {
   const packs = usePacks();
   const [importing, setImporting] = useState<string[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const pool = new Set([settings.packId, ...settings.packPool]);
 
@@ -336,6 +338,17 @@ function CharacterSettings({ settings }: { settings: Settings }) {
     await notifyPacksChanged();
   };
 
+  if (searching && !importing) {
+    return (
+      <GifSearch
+        onCancel={() => setSearching(false)}
+        onPicked={(files) => {
+          setSearching(false);
+          setImporting(files);
+        }}
+      />
+    );
+  }
   if (importing) {
     return (
       <ImportWizard
@@ -374,7 +387,8 @@ function CharacterSettings({ settings }: { settings: Settings }) {
         ))}
       </div>
       <div className="presets">
-        <button className="primary" onClick={pickGifs}>Импортировать гифки…</button>
+        <button className="primary" onClick={() => setSearching(true)}>Найти гифки в интернете…</button>
+        <button onClick={pickGifs}>Гифки с компьютера…</button>
         <button onClick={() => importPack(false)}>Пак из файла .fampack…</button>
         <button onClick={() => importPack(true)}>Пак из папки…</button>
       </div>

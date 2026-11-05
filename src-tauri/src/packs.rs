@@ -454,6 +454,67 @@ pub async fn install_pack_from_url(app: AppHandle, url: String, pack_id: String)
     result
 }
 
+/// A GIF picked in the search panel.
+#[derive(Debug, Deserialize)]
+pub struct RemoteGif {
+    pub url: String,
+    pub title: String,
+}
+
+const MAX_GIF_BYTES: usize = 20 * 1024 * 1024;
+const MAX_GIFS: usize = 40;
+
+/// Only the GIF search's CDN, over https (the URLs come from our gif-search function).
+fn gif_url_allowed(url: &str) -> bool {
+    let Ok(u) = reqwest::Url::parse(url) else { return false };
+    let host = u.host_str().unwrap_or("");
+    u.scheme() == "https" && (host == "klipy.com" || host.ends_with(".klipy.com"))
+}
+
+/// Download GIFs chosen in the search panel into a cache folder; the import wizard then turns
+/// them into a pack like any local files. Returns local paths in the same order.
+#[tauri::command]
+pub async fn download_gifs(app: AppHandle, gifs: Vec<RemoteGif>) -> Result<Vec<String>, String> {
+    if gifs.is_empty() || gifs.len() > MAX_GIFS {
+        return Err(format!("выбери от 1 до {MAX_GIFS} гифок"));
+    }
+    let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?.join("gif-search");
+    let _ = fs::remove_dir_all(&cache); // leftovers of an earlier search
+    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::custom(|a| {
+            if gif_url_allowed(a.url().as_str()) && a.previous().len() < 5 { a.follow() } else { a.stop() }
+        }))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::with_capacity(gifs.len());
+    for (i, g) in gifs.iter().enumerate() {
+        if !gif_url_allowed(&g.url) {
+            return Err("гифку можно скачать только из поиска".into());
+        }
+        let resp = client.get(&g.url).send().await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("сервер ответил {}", resp.status()));
+        }
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        if bytes.len() > MAX_GIF_BYTES {
+            return Err("гифка слишком большая".into());
+        }
+        // Trust the bytes, not the URL, for the extension.
+        let ext = if bytes.starts_with(b"GIF8") {
+            "gif"
+        } else if bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+            "webp"
+        } else {
+            return Err("это не гифка".into());
+        };
+        let path = cache.join(format!("{i:02}-{}.{ext}", slug(&g.title)));
+        fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+        out.push(path.to_string_lossy().into_owned());
+    }
+    Ok(out)
+}
+
 /// Let the import wizard preview images the user just picked (they live outside the pack folders).
 #[tauri::command]
 pub fn allow_previews(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
@@ -546,6 +607,16 @@ mod tests {
         // No idle image chosen: the first one is used at rest too.
         assert_eq!(m.states[&Mood::Idle], m.states[&Mood::Talking]);
         assert!(Manifest::read(&root.path().join(&m.id)).is_ok());
+    }
+
+    #[test]
+    fn gif_downloads_only_from_the_search_cdn() {
+        assert!(gif_url_allowed("https://static.klipy.com/ii/a/b.gif"));
+        assert!(gif_url_allowed("https://klipy.com/x.gif"));
+        assert!(!gif_url_allowed("http://static.klipy.com/a.gif"));
+        assert!(!gif_url_allowed("https://evilklipy.com/a.gif"));
+        assert!(!gif_url_allowed("https://klipy.com.evil.io/a.gif"));
+        assert!(!gif_url_allowed("file:///etc/passwd"));
     }
 
     #[test]

@@ -448,3 +448,6 @@ enabled = true
 # Free packs are downloadable without signing in; the function checks the user itself for paid ones.
 [functions.pack-download]
 verify_jwt = false
+
+[functions.gif-search]
+verify_jwt = false

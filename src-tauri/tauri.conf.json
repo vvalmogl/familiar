@@ -55,7 +55,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob: https://*.supabase.co https://avatars.githubusercontent.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost https://*.supabase.co wss://*.supabase.co; font-src 'self' data:",
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob: https://*.supabase.co https://avatars.githubusercontent.com https://*.googleusercontent.com https://*.klipy.com; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost https://*.supabase.co wss://*.supabase.co; font-src 'self' data:",
       "assetProtocol": {
         "enable": true,
         "scope": [
@@ -63,7 +63,7 @@
           "$RESOURCE/packs/**"
         ]
       },
-      "devCsp": "default-src 'self' http://localhost:1420; script-src 'self' 'unsafe-inline' http://localhost:1420; img-src 'self' asset: http://asset.localhost data: blob: https://*.supabase.co https://avatars.githubusercontent.com https://*.googleusercontent.com http://localhost:1420; style-src 'self' 'unsafe-inline' http://localhost:1420; connect-src 'self' ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co ws://localhost:1420 http://localhost:1420; font-src 'self' data:"
+      "devCsp": "default-src 'self' http://localhost:1420; script-src 'self' 'unsafe-inline' http://localhost:1420; img-src 'self' asset: http://asset.localhost data: blob: https://*.supabase.co https://avatars.githubusercontent.com https://*.googleusercontent.com https://*.klipy.com http://localhost:1420; style-src 'self' 'unsafe-inline' http://localhost:1420; connect-src 'self' ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co ws://localhost:1420 http://localhost:1420; font-src 'self' data:"
     }
   },
   "bundle": {

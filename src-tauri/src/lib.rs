@@ -102,6 +102,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             packs::list_packs,
             packs::import_gifs,
+            packs::download_gifs,
             packs::import_pack,
             packs::delete_pack,
             providers::ask,
