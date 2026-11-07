@@ -39,6 +39,7 @@ const EN = {
   "q4.q": "Can I make my own character?", "q4.a": "Yes: drop GIFs or images in settings, sort them by mood (idle, thinking, talking, happy) and you're done. Packs made by others install from a single .fampack file or from the gallery.",
   "q5.q": "Why does macOS warn me on first launch?", "q5.a": "An Apple signature costs $99 a year and the project doesn't have one yet. The app is safe: the source is open and builds run automatically on GitHub. See “Install”.",
   "foot.privacy": "Privacy",
+  "foot.terms": "Terms",
 };
 const RU = {};
 document.querySelectorAll("[data-i18n]").forEach((el) => (RU[el.dataset.i18n] = el.innerHTML));
