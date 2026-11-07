@@ -449,6 +449,14 @@ enabled = true
 [functions.pack-download]
 verify_jwt = false
 
-# Callers need the app's anon (or a user) JWT; the function also rate-limits per IP.
+# Familiar Plus only: the function checks the signed-in user's subscription and rate-limits per user.
 [functions.gif-search]
 verify_jwt = true
+
+# Needs a signed-in user's JWT; the function checks the account itself.
+[functions.subscribe]
+verify_jwt = true
+
+# Called by Telegram, authenticated by the X-Telegram-Bot-Api-Secret-Token header.
+[functions.telegram-webhook]
+verify_jwt = false

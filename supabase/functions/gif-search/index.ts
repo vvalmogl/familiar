@@ -1,29 +1,25 @@
-// GIF search for the character wizard, proxied so the KLIPY key never ships in the app.
+// GIF search for the character wizard (Familiar Plus), proxied so the KLIPY key never ships in the app.
 // POST { "q": "...", "page": 1, "locale": "ru" } → { items: [{ id, title, preview, url, width, height }], hasNext }
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+// 401 → not signed in, 402 → no active subscription.
+import { caller, cors, hasPlus, json } from "../_shared/plus.ts";
 
 type Media = { url: string; width: number; height: number; size?: number };
 type Sizes = Partial<Record<"gif" | "webp" | "jpg" | "mp4" | "webm", Media>>;
 type Item = { id: number | string; slug?: string; title?: string; file?: Partial<Record<"hd" | "md" | "sm" | "xs", Sizes>> };
 
-// Best-effort per-IP limit (per function instance) so one client can't burn the shared KLIPY quota.
+// Best-effort per-user limit (per function instance) so one subscriber can't burn the shared KLIPY quota.
 const WINDOW_MS = 60_000;
 const PER_WINDOW = 20;
 const hits = new Map<string, number[]>();
-// Instance-wide budget: bounds KLIPY usage even if per-IP keys are spoofed or evicted.
+// Instance-wide budget: bounds KLIPY usage across all subscribers.
 const GLOBAL_PER_WINDOW = 300;
 let globalHits: number[] = [];
-function limited(ip: string): boolean {
+function limited(who: string): boolean {
   const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  const recent = (hits.get(who) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
-  hits.delete(ip); // re-insert so Map order stays least-recently-used first
-  hits.set(ip, recent);
+  hits.delete(who); // re-insert so Map order stays least-recently-used first
+  hits.set(who, recent);
   if (hits.size > 10_000) hits.delete(hits.keys().next().value!); // evict the stalest client only
   if (recent.length > PER_WINDOW) return true; // over its own limit: don't spend the shared budget
   globalHits = globalHits.filter((t) => now - t < WINDOW_MS);
@@ -35,10 +31,10 @@ function limited(ip: string): boolean {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
-  // The platform's edge sets cf-connecting-ip; otherwise trust only the entry our proxy appended (the
-  // rightmost), since a client can put anything at the front of X-Forwarded-For.
-  const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",").pop()?.trim() ?? "unknown";
-  if (limited(ip)) return json({ error: "слишком много запросов, попробуй через минуту" }, 429);
+  const user = await caller(req);
+  if (!user) return json({ error: "войди в аккаунт, чтобы искать гифки" }, 401);
+  if (!(await hasPlus(user.id))) return json({ error: "поиск гифок входит в Familiar Plus" }, 402);
+  if (limited(user.id)) return json({ error: "слишком много запросов, попробуй через минуту" }, 429);
   const key = Deno.env.get("KLIPY_KEY");
   if (!key) return json({ error: "поиск гифок ещё не настроен" }, 503);
 

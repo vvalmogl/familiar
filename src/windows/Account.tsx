@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import { enabledProviders, handleAuthCallback, signInWith, signInWithEmail, signOut, supabase, useSession } from "../lib/account";
+import { buyPlus, enabledProviders, handleAuthCallback, PLUS_STARS, signInWith, signInWithEmail, signOut, supabase, usePlus, useSession } from "../lib/account";
 import { startSync, trackLocalEdits } from "../lib/sync";
 import { notifyPacksChanged, usePacks } from "../packs/registry";
 
@@ -75,6 +75,7 @@ export function AccountSection({ account }: { account: ReturnType<typeof useAcco
           <button onClick={() => run(signOut)}>Выйти</button>
         </div>
         <p className="status ok">● Настройки синхронизируются: тема, нейросеть, персонажи</p>
+        <PlusStatus />
         {syncStatus && <p className="muted">{syncStatus}</p>}
         {error && <p className="status bad">{error}</p>}
       </div>
@@ -122,6 +123,30 @@ export function AccountSection({ account }: { account: ReturnType<typeof useAcco
       )}
       {(error || authError) && <p className="status bad">{error || authError}</p>}
       <p className="muted small">Пароль не нужен. Мы храним только почту и настройки — без вопросов к нейросети.</p>
+    </div>
+  );
+}
+
+/** Familiar Plus line under the profile: active until …, or a button to subscribe. */
+function PlusStatus() {
+  const plus = usePlus(useSession());
+  const [error, setError] = useState("");
+  if (plus.until === undefined) return null;
+  if (plus.until)
+    return (
+      <p className="status ok">
+        ★ Familiar Plus до {plus.until.toLocaleDateString("ru-RU")}. Отменить: Telegram → Настройки → Мои звёзды
+      </p>
+    );
+  return (
+    <div className="plus-offer">
+      <span>
+        <b>Familiar Plus</b> <span className="muted">— поиск гифок по всему интернету, {PLUS_STARS} ⭐ в месяц</span>
+      </span>
+      <button className="primary" onClick={() => buyPlus().catch((e) => setError(String(e.message ?? e)))}>
+        Оформить
+      </button>
+      {error && <p className="status bad">{error}</p>}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
-import { supabase } from "../lib/account";
+import { useEffect, useState } from "react";
+import { buyPlus, PLUS_STARS, supabase, usePlus, useSession } from "../lib/account";
 
 interface Gif {
   id: string;
@@ -56,7 +56,12 @@ export default function GifSearch({ onCancel, onPicked }: { onCancel: () => void
     }
   };
 
+  const session = useSession();
+  const plus = usePlus(session);
+
   if (!supabase) return <p className="muted">Поиск гифок недоступен в этой сборке.</p>;
+  if (session === undefined || plus.until === undefined) return <p className="muted">Загрузка…</p>;
+  if (!plus.until) return <Paywall signedIn={!!session} refresh={plus.refresh} onCancel={onCancel} />;
 
   return (
     <div className="gif-search">
@@ -100,6 +105,56 @@ export default function GifSearch({ onCancel, onPicked }: { onCancel: () => void
             Дальше{picked.length ? ` (${picked.length})` : ""}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Shown instead of the search until the account has Familiar Plus. Own GIFs stay free. */
+function Paywall({ signedIn, refresh, onCancel }: { signedIn: boolean; refresh: () => Promise<void>; onCancel: () => void }) {
+  const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState("");
+
+  // After the checkout opens in Telegram, pick up the payment as soon as the webhook records it.
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setInterval(refresh, 3000);
+    const stop = setTimeout(() => setWaiting(false), 10 * 60_000);
+    return () => (clearInterval(t), clearTimeout(stop));
+  }, [waiting, refresh]);
+
+  const buy = async () => {
+    setError("");
+    try {
+      await buyPlus();
+      setWaiting(true);
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+    }
+  };
+
+  return (
+    <div className="paywall">
+      <h3>Familiar Plus</h3>
+      <p>Поиск гифок по всему интернету: аниме, фильмы, мемы, знаменитости. Нашёл, выбрал несколько, и персонаж готов.</p>
+      <ul className="muted">
+        <li>Миллионы гифок прямо в приложении</li>
+        <li>Сколько угодно своих персонажей</li>
+        <li>Отменить можно в любой момент в Telegram</li>
+      </ul>
+      <p className="muted small">Свои гифки с компьютера добавляются бесплатно, без подписки.</p>
+      {signedIn ? (
+        <button className="primary" onClick={buy}>
+          Оформить за {PLUS_STARS} ⭐ в месяц
+        </button>
+      ) : (
+        <p className="status">Сначала войди в разделе «Аккаунт»: подписка привязывается к нему.</p>
+      )}
+      {waiting && <p className="muted">Оплата открыта в Telegram. Как только пройдёт, поиск откроется сам.</p>}
+      {error && <p className="status bad">{error}</p>}
+      <div className="presets">
+        <button onClick={onCancel}>Назад</button>
+        {waiting && <button onClick={refresh}>Я оплатил</button>}
       </div>
     </div>
   );

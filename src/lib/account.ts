@@ -1,6 +1,6 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -67,4 +67,33 @@ export function useSession(): Session | null | undefined {
     return () => data.subscription.unsubscribe();
   }, []);
   return session;
+}
+
+/** Familiar Plus expiry for the signed-in user: undefined while loading, null when not subscribed. */
+export function usePlus(session: Session | null | undefined) {
+  const [until, setUntil] = useState<Date | null | undefined>(undefined);
+  const userId = session?.user.id;
+  const loading = session === undefined;
+  const refresh = useCallback(async () => {
+    if (!supabase || !userId) return setUntil(null);
+    const { data } = await supabase.from("subscriptions").select("expires_at").eq("user_id", userId).maybeSingle();
+    const d = data ? new Date(data.expires_at) : null;
+    setUntil(d && d.getTime() > Date.now() ? d : null);
+  }, [userId]);
+  useEffect(() => {
+    if (!loading) refresh();
+  }, [loading, refresh]);
+  return { until, refresh };
+}
+
+export const PLUS_STARS = 150;
+
+/** Opens the Telegram Stars subscription for this account in Telegram. */
+export async function buyPlus() {
+  const { data, error } = await client().functions.invoke<{ url: string }>("subscribe", { body: {} });
+  if (error || !data?.url) {
+    const body = await (error as { context?: Response })?.context?.json?.().catch(() => null);
+    throw new Error(body?.error ?? "не получилось открыть оплату");
+  }
+  await openUrl(data.url);
 }

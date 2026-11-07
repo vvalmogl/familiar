@@ -272,3 +272,11 @@ html[data-dark="true"] .oauth-btn.github { background: #f0f2f5; color: #1f2328; 
 .gif-grid .gif.on { border-color: var(--accent); }
 .gif-grid .badge { position: absolute; top: 4px; right: 4px; min-width: 22px; height: 22px; border-radius: 11px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
 .gif-foot { display: flex; align-items: center; justify-content: space-between; }
+
+/* Familiar Plus */
+.paywall { display: flex; flex-direction: column; gap: 10px; max-width: 460px; }
+.paywall h3 { margin: 0; }
+.paywall ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+.paywall .primary { align-self: flex-start; }
+.plus-offer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 10px; background: rgba(127, 127, 140, 0.08); }
